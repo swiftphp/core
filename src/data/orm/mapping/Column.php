@@ -144,7 +144,7 @@ class Column
      */
     public function setPrimary($value)
     {
-        $this->m_primary= $value;
+        $this->m_primary = $value;
     }
 
     /**
