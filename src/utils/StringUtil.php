@@ -39,7 +39,6 @@ class StringUtil
         }
 
         //前面出现的下划线
-        $pos=0;
         $preLines="";
         for($i=0;$i<$len;$i++){
             $s=substr($value, $i,1);
