@@ -90,7 +90,7 @@ class Column
      */
     public function setDbType($value)
     {
-        $this->m_dbType=$value;
+        $this->m_dbType = $value;
     }
 
     /**
