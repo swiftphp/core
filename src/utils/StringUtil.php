@@ -33,12 +33,28 @@ class StringUtil
      */
     public static function toHumpString($value,$firstUpperCase=false)
     {
+        $len=strlen($value);
+        if($len==0){
+            return $value;
+        }
+
+        //前面出现的下划线
+        $pos=0;
+        $preLines="";
+        for($i=0;$i<$len;$i++){
+            $s=substr($value, $i,1);
+            if($s!="_"){
+                break;
+            }
+            $preLines.="_";
+        }
+
         $value= ucwords(str_replace("_", " ", $value));
         $value= str_replace(" ","",$value);
         if(!$firstUpperCase){
             $value=lcfirst($value);
         }
-        return $value;
+        return $preLines.$value;
     }
 
     /**
