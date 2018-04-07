@@ -1,0 +1,21 @@
+{
+	"name" : "swiftphp/swiftphp-core",
+	"description" : "SwiftPHP 基于PHP5的快速的面向对象的PHP类库",
+	"type" : "library",
+	"license" : "MIT",
+	"version" : "1.0.1",
+	"minimum-stability" : "dev",
+	"authors" : [{
+			"name" : "Tomix Chiu",
+			"email" : "qhr2001@yahoo.com"
+		}
+	],
+	"require" : {
+		"php" : ">=5.6.0"
+	},
+	"autoload" : {
+		"psr-4" : {
+			"swiftphp\\core\\" : "src"
+		}
+	}
+}
