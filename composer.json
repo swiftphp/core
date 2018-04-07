@@ -1,5 +1,5 @@
 {
-	"name" : "swiftphp/swiftphp-core",
+	"name" : "swiftphp/core",
 	"description" : "SwiftPHP 基于PHP5的快速的面向对象的PHP类库",
 	"type" : "library",
 	"license" : "MIT",
