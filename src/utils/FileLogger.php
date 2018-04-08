@@ -64,7 +64,7 @@ class FileLogger implements ILogger,IConfigurable
     {
         $dir=__DIR__."/../../_logs/";
         if(!empty($this->m_config)){
-            $dir=$this->m_config->getConfigDir();
+            $dir=$this->m_config->getBaseDir();
             $_dir=$this->m_config->getConfigValue(BuiltInConst::$globalConfigSection, "logDir");
             if(!empty($_dir)){
                 $dir=Path::combinePath($dir,$_dir);

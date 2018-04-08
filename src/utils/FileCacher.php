@@ -107,7 +107,7 @@ class FileCacher implements ICacher,IConfigurable
     {
         $dir=__DIR__."/../../_cache/app/";
         if(!empty($this->m_config)){
-            $dir=Path::combinePath($this->m_config->getConfigDir(), "_cache/");
+            $dir=Path::combinePath($this->m_config->getBaseDir(), "_cache/");
             $_dir=$this->m_config->getConfigValue(BuiltInConst::$globalConfigSection, "cacheDir");
             if(empty($_dir)){
                 $dir=Path::combinePath($dir,$_dir);

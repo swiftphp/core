@@ -154,7 +154,7 @@ class Container
                 }
 
                 //如果模板文件存在，则按模板输出
-                $tempFile=Path::combinePath($this->m_config->getConfigDir(), $this->m_errorTemplate);
+                $tempFile=Path::combinePath($this->m_config->getBaseDir(), $this->m_errorTemplate);
                 if(is_file($tempFile)){
                     echo file_get_contents($tempFile);
                 }else{

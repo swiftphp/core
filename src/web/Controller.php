@@ -444,7 +444,7 @@ class Controller implements IController,IConfigurable
     {
         $runtimeDir=$this->m_runtimeDir;
         if(empty($runtimeDir)){
-            $runtimeDir=rtrim($this->m_config->getConfigDir(),"/")."/_runtime";
+            $runtimeDir=rtrim($this->m_config->getBaseDir(),"/")."/_runtime";
         }
         if(!file_exists($runtimeDir)){
             File::createDir($runtimeDir);

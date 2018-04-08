@@ -531,7 +531,7 @@ class HtmlView extends View implements IOutput
          */
 
         //根目录: 相对于配置文件位置定义为根目录.
-        $rootDir=rtrim($this->m_config->getConfigDir(),"/");
+        $rootDir=rtrim($this->m_config->getBaseDir(),"/");
 
         //以/起的路径:相对于根目录,不需要搜索.
         if(strpos($this->m_viewFile, "/")===0){
