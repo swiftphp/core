@@ -42,7 +42,7 @@ class Loader
     {
         if(!empty($map)){
             self::$m_classMap=$map;
-            spl_autoload_register(["swiftphp\core\\system\\Loader", "_autoLoad"]);
+            spl_autoload_register(["swiftphp\\core\\system\\Loader", "_autoLoad"]);
         }
     }
 }
