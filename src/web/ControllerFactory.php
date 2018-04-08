@@ -39,7 +39,7 @@ class ControllerFactory implements IControllerFactory,IConfigurable
      * 控制器初始化属性(由配置文件配置的对象不会被注入)
      * @param array $value
      */
-    public function setControllerProperties($value)
+    public function setControllerProperties(array $value)
     {
         $this->m_controllerProperties=$value;
     }

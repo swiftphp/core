@@ -21,5 +21,11 @@ interface IControllerFactory
      * @return IController,控制器实例
      */
     function createByClass($controllerClass);
+
+    /**
+     * 控制器初始化属性
+     * @param array $value
+     */
+    function setControllerProperties(array $value);
 }
 

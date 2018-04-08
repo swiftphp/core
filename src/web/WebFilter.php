@@ -9,6 +9,7 @@ use swiftphp\core\http\FilterChain;
 use swiftphp\core\web\IView;
 use swiftphp\core\http\IOutput;
 use swiftphp\core\web\out\Base;
+use swiftphp\core\config\ObjectFactory;
 
 /**
  * MVC模型入口,Web过滤器
@@ -105,13 +106,19 @@ class WebFilter implements IFilter,IConfigurable
      */
     public function getControllerFactory()
     {
-        if(is_null($this->m_controllerFactory)){
-            $this->m_controllerFactory=new ControllerFactory();
-            if($this->m_controllerFactory instanceof IConfigurable){
-                $this->m_controllerFactory->setConfiguration($this->m_config);
-            }
+        //外部注入的工厂
+        $factory=$this->m_controllerFactory;
+
+        //默认控制器类型
+        $defaultFactoryClass=ControllerFactory::class;
+
+        //如果外部没有注入,从对象工厂创建
+        if(is_null($factory)){
+            $factory=ObjectFactory::getInstance($this->m_config)->createByClass($defaultFactoryClass);
         }
-        return $this->m_controllerFactory;
+
+        //返回工厂实例
+        return $factory;
     }
 
 
