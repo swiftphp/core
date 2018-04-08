@@ -151,6 +151,8 @@ class ObjectFactory
             $obj->setConfiguration($this->m_config);
         }
 
+        //返回对象
+        return $obj;
     }
 
     /**
