@@ -25,7 +25,7 @@ class HtmlView extends View implements IOutput
      * 注册的标签库
      * @var array
      */
-    protected $m_taglibs=["php"=>"swiftphp\core\\web\\tags"];
+    protected $m_taglibs=["php"=>"swiftphp\\core\\web\\tags"];
 
     /**
      * 标签统计处理标记
