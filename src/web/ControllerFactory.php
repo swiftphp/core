@@ -68,6 +68,7 @@ class ControllerFactory implements IControllerFactory,IConfigurable
 
         //从对象工厂创建
         if(!is_null($this->m_config)){
+            //不能使用createByClass创建,必须是显式配置的对象才能从对象工厂创建
             $controller=ObjectFactory::getInstance($this->m_config)->create($controllerClass);
         }
 
