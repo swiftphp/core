@@ -315,8 +315,6 @@ class Dao implements IConfigurable
                 $model->$name = $_sets;
             }
         }
-        // $this->m_database->rollbackTransaction();
-        // return false;
         if (is_null($this->getException())) {
             return true;
         } else {
@@ -477,10 +475,6 @@ class Dao implements IConfigurable
                 }
             }
         }
-        // echo $sql;
-        // if(!$this->m_transactionStatus)
-        // $this->m_database->rollbackTransaction();
-        // exit;
         if (is_null($this->getException())) {
             if (!$this->m_transactionStatus){
                 $this->getDatabase()->commit();
@@ -579,10 +573,6 @@ class Dao implements IConfigurable
             }
             throw new \Exception("数据保存失败,可能原因为数据版本冲突",0);//异常信息以后修改
         }
-
-        // echo $sql;
-        // $this->m_database->rollbackTransaction();
-        // return false;
 
         // 更新关联表
         if ($sync) {
@@ -876,9 +866,6 @@ class Dao implements IConfigurable
         // 删除主表记录
         $sql = "DELETE " . $alias . " FROM " . $table . " " . $alias . " WHERE " . $filter;
         $sql_array[] = $sql;
-        // foreach ($sql_array as $sql){echo $sql."\r\n";}
-        // $this->m_database->rollbackTransaction();
-        // return false;
         $intRows = - 1;
         foreach ($sql_array as $sql) {
             $intRows = $this->getDatabase()->execute($sql);
@@ -1095,7 +1082,7 @@ class Dao implements IConfigurable
         }
         //         echo $sql;
         //         exit;
-        return $this->getDatabase()->executeScalar($sql);
+        return $this->getDatabase()->scalar($sql);
     }
 
     /**
@@ -1107,9 +1094,9 @@ class Dao implements IConfigurable
         if(!$this->m_transactionStatus){
             $this->getDatabase()->begin();
         }
-        $rs=$this->getDatabase()->executeNonQuery($sql);
+        $rs=$this->getDatabase()->execute($sql);
 
-        if (! $this->getDatabase()->getErrorCode()) {
+        if (is_null($this->getException())) {
             if (! $this->m_transactionStatus){
                 $this->getDatabase()->commit();
             }
@@ -1118,9 +1105,7 @@ class Dao implements IConfigurable
             if (! $this->m_transactionStatus){
                 $this->getDatabase()->rollback();
             }
-            $this->m_errorCode = $this->getDatabase()->getErrorCode();
-            $this->m_errorMessage = $this->getDatabase()->getErrorMessage();
-            throw new \Exception($this->getDatabase()->getErrorMessage(),$this->getDatabase()->getErrorCode());
+            throw $this->getException();
         }
     }
 
@@ -1133,7 +1118,7 @@ class Dao implements IConfigurable
      */
     public function sqlQuery($sql,$offset=0,$limit=-1)
     {
-        return $this->getDatabase()->executeRecordset($sql,$offset,$limit);
+        return $this->getDatabase()->query($sql,$offset,$limit);
     }
 
     /**
