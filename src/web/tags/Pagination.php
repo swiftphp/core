@@ -1,7 +1,12 @@
 <?php
 namespace swiftphp\core\web\tags;
 
-class Pagenav extends TagBase
+/**
+ * 分页控制标签
+ * @author Tomix
+ *
+ */
+class Pagination extends TagBase
 {
     //当前页面索引(默认值:1)
     public $pageIndex=1;
