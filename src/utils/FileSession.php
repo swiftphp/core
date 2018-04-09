@@ -119,7 +119,7 @@ class FileSession implements ISession,IConfigurable
         if(empty($sessionId)){
             $sessionId=isset($_COOKIE[$this->m_cookieKey])?$_COOKIE[$this->m_cookieKey]:"";
             if(empty($sessionId)){
-                $sessionId=AppUtil::newGuid();
+                $sessionId=SecurityUtil::newGuid();
                 setcookie($this->m_cookieKey,$sessionId,0,"/",".".AppUtil::getDomain());
             }
         }

@@ -4,9 +4,9 @@ namespace swiftphp\core\web\out;
 use swiftphp\core\http\IOutput;
 use swiftphp\core\web\View;
 use swiftphp\core\utils\StringUtil;
-use swiftphp\core\utils\AppUtil;
 use swiftphp\core\web\HtmlHelper;
 use swiftphp\core\web\ITag;
+use swiftphp\core\utils\SecurityUtil;
 
 /**
  * 视图引擎输出
@@ -339,7 +339,7 @@ class HtmlView extends View implements IOutput
                     $tag=$match[1];
 
                     $search="/<".$prefix.":".$tag."/";
-                    $replace="<".$this->m_tagPlaceHolder." _tag=\"".$prefix.":".$tag."\" _id=\"".AppUtil::newGuid()."\"";
+                    $replace="<".$this->m_tagPlaceHolder." _tag=\"".$prefix.":".$tag."\" _id=\"".SecurityUtil::newGuid()."\"";
                     $view=preg_replace($search, $replace, $view,1);
 
                     $search="</".$prefix.":".$tag.">";
