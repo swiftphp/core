@@ -68,7 +68,7 @@ class ObjectFactory
     }
 
     /**
-     * 根据对象ID创建对象
+     * 根据对象ID或类型名创建对象(此种方式必须配置对象)
      * 执行过程:创建对象,注入全局配置,注入当前配置,注入配置实例
      * @param string $objectId 对象id(未配置id属性时,以类型名为id)
      */
@@ -117,20 +117,27 @@ class ObjectFactory
     }
 
     /**
-     * 根据类型名创建对象
+     * 根据类型名创建对象(若有配置,则从配置创建,否则直接创建)
      * @param string $class         对象类型名
-     * @param string $configSection 所在配置节点
      * @param $singleton            是否单例模式(如果有配置,则忽略此参数)
      */
-    public function createByClass($class,$configSection="objects",$singleton=true)
+    public function createByClass($class,$singleton=true)
     {
         //使用类型名代替ID创建对象
-        $obj=$this->create($class,$configSection);
+        $obj=$this->create($class);
         if(!is_null($obj)){
             return $obj;
         }
 
-        //创建对象
+        //单例模式下,尝试从缓存获取
+        if($singleton && array_key_exists($class, $this->m_singletonObjMap)){
+            $obj=$this->m_singletonObjMap[$class];
+            if(!is_null($obj)){
+                return $obj;
+            }
+        }
+
+        //直接从类型名创建对象
         if(!class_exists($class)){
             return null;
         }
@@ -141,14 +148,14 @@ class ObjectFactory
             $this->setProperty($obj, $name, $value);
         }
 
-        //如果为单态模式,则保存到缓存
-        if($singleton){
-            $this->m_singletonObjMap[$class]=$obj;
-        }
-
         //通过配置接口注入配置实例
         if($obj instanceof IConfigurable){
             $obj->setConfiguration($this->m_config);
+        }
+
+        //如果为单态模式,则保存到缓存
+        if($singleton){
+            $this->m_singletonObjMap[$class]=$obj;
         }
 
         //返回对象
