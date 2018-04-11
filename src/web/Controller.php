@@ -107,6 +107,15 @@ class Controller implements IController,IConfigurable
         $this->m_debug=$value;
     }
 
+    /**
+     * 是否为调试模式
+     * @return string
+     */
+    public function getDebug()
+    {
+        return $this->m_debug;
+    }
+
 
     /**
      * 注入配置实例
