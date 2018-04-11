@@ -101,6 +101,15 @@ class WebFilter implements IFilter,IConfigurable
     }
 
     /**
+     * 设置错误控制器
+     * @param IController $value
+     */
+    public function setErrorController(IController $value)
+    {
+        $this->m_errorController=$value;
+    }
+
+    /**
      * 获取控制器工厂(如果当前没有配置,则创建一个内置的默认工厂)
      * @return IControllerFactory
      */
@@ -193,25 +202,51 @@ class WebFilter implements IFilter,IConfigurable
 
             //注入控制器属性
             $controller->setContext($context);
-            $controller->setAreaName($this->getRoute()->getAreaName());
-            $controller->setAreaPrefix($this->getRoute()->getAreaPrefix());
-            $controller->setViewFile($this->getRoute()->getViewFile());
-            $controller->setInitParams($this->getRoute()->getInitParams());
             $controller->setViewEngine($this->m_viewEngine);
             $controller->setRuntimeDir($this->getRuntimeDir());
             $controller->setDebug($this->m_debug);
 
+            //注入控制器属性(路由)
+            $controller->setAreaName($this->getRoute()->getAreaName());
+            $controller->setAreaPrefix($this->getRoute()->getAreaPrefix());
+            $controller->setViewFile($this->getRoute()->getViewFile());
+            $controller->setInitParams($this->getRoute()->getInitParams());
+
             //激活控制器方法后，返回一个IOutput代理对象，并让response的输出代理指向该对象
             $model = $controller->invoke($this->getRoute()->getActionName());
-            if(!empty($model))
-            {
-                if($model instanceof IOutput)
+            if(!empty($model)){
+                if($model instanceof IOutput){
                     $context->getResponse()->setOutput($model);
-                else
+                }else{
                     $context->getResponse()->setOutput(new Base($model));
+                }
             }
         }catch (\Exception $ex){
-            throw $ex;
+            //调试状态下,直接向外抛出异常;否则调用错误控制器输出404
+            if(!$this->m_debug && !is_null($this->m_errorController)){
+
+                //注入控制器属性
+                $this->m_errorController->setContext($context);
+                $this->m_errorController->setViewEngine($this->m_viewEngine);
+                $this->m_errorController->setRuntimeDir($this->getRuntimeDir());
+                $this->m_errorController->setDebug($this->m_debug);
+                try{
+                    //激活404方法
+                    $actionName="_404";
+                    $model = $this->m_errorController->invoke($actionName);
+                    if(!empty($model)){
+                        if($model instanceof IOutput){
+                            $context->getResponse()->setOutput($model);
+                        }else{
+                            $context->getResponse()->setOutput(new Base($model));
+                        }
+                    }
+                }catch (\Exception $e){
+                    throw $e;
+                }
+            }else {
+                throw $ex;
+            }
         }
 
         $chain->filter($context);
