@@ -344,20 +344,23 @@ class Container
             if(!headers_sent()){
                 http_response_code($rsp->getCode());
                 $headers=$rsp->getHeaders();
-                if(!array_key_exists("content-type", $headers) && !empty($rsp->getContentType()))
+                if(!array_key_exists("content-type", $headers) && !empty($rsp->getContentType())){
                     $headers["content-type"]=$rsp->getContentType();
-                    foreach ($headers as $name => $value){
-                        if(empty($value))
-                            header($name);
-                            else
-                                header($name.":".$value);
+                }
+                foreach ($headers as $name => $value){
+                    if(empty($value)){
+                        header($name);
+                    }else{
+                        header($name.":".$value);
                     }
+                }
             }
 
             //内容输出代理
             $out=$rsp->getOutput();
-            if(!empty($out))
+            if(!empty($out)){
                 $out->output();
+            }
         }
     }
 }
