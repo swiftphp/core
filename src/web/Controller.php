@@ -12,6 +12,7 @@ use swiftphp\core\web\out\Jsonp;
 use swiftphp\core\web\out\HtmlView;
 use swiftphp\core\io\File;
 use swiftphp\core\http\Request;
+use swiftphp\core\http\IOutput;
 
 /**
  * 控制器内置基本类型
