@@ -130,6 +130,9 @@ class FileCacher implements ICacher,IConfigurable
         if(!file_exists($dir)){
             File::createDir($dir);
         }
+        if(strrpos($dir, "/")!==strlen($dir)-1){
+            $dir.="/";
+        }
         return $dir;
     }
 }
