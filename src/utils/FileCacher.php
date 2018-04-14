@@ -21,6 +21,12 @@ class FileCacher implements ICacher,IConfigurable
      */
     protected $m_config=null;
 
+    /**
+     * 缓存目录,相对于应用根目录
+     * @var string
+     */
+    protected $m_cacheDir;
+
 
     /**
      * 注入配置实例
@@ -29,6 +35,15 @@ class FileCacher implements ICacher,IConfigurable
     public function setConfiguration(IConfiguration $value)
     {
         $this->m_config=$value;
+    }
+
+    /**
+     * 设置缓存目录,相对于应用根目录
+     * @param string $value
+     */
+    public function setCacheDir($value)
+    {
+        $this->m_cacheDir=$value;
     }
 
     /**
@@ -105,14 +120,12 @@ class FileCacher implements ICacher,IConfigurable
      */
     private function getCacheDir()
     {
-        $dir=__DIR__."/../../_cache/app/";
-        if(!empty($this->m_config)){
-            $dir=Path::combinePath($this->m_config->getBaseDir(), "_cache/");
-            $_dir=$this->m_config->getConfigValue(BuiltInConst::$globalConfigSection, "cacheDir");
-            if(empty($_dir)){
-                $dir=Path::combinePath($dir,$_dir);
-            }
-            $dir=Path::combinePath($dir,"app/");
+        $baseDir=$this->m_config->getBaseDir();
+        $dir="";
+        if(!empty($this->m_cacheDir)){
+            $dir=Path::combinePath($baseDir, $this->m_cacheDir);
+        }else{
+            $dir=Path::combinePath($baseDir, "_cache/app/");
         }
         if(!file_exists($dir)){
             File::createDir($dir);
