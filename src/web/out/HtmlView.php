@@ -40,6 +40,12 @@ class HtmlView extends View implements IOutput
     private $m_outputContent="";
 
     /**
+     * 模板需要的参数
+     * @var array
+     */
+    private $m_onlyViewParams=[];
+
+    /**
      * 输出
      * {@inheritDoc}
      * @see \swiftphp\core\http\IOutput::output()
@@ -48,12 +54,12 @@ class HtmlView extends View implements IOutput
     {
         if(empty($this->m_outputContent))
             $this->m_outputContent=$this->getContent();
-        $content=$this->m_outputContent;
-        $cacheFile=$this->getRuntimeDir()."/".md5($content);
-        if(!file_exists($cacheFile)){
-            file_put_contents($cacheFile, $content);
-        }
-        require_once $cacheFile;
+            $content=$this->m_outputContent;
+            $cacheFile=$this->getRuntimeDir()."/".md5($content);
+            if(!file_exists($cacheFile)){
+                file_put_contents($cacheFile, $content);
+            }
+            require_once $cacheFile;
     }
 
     /**
@@ -94,6 +100,9 @@ class HtmlView extends View implements IOutput
             file_put_contents($tagLibInfoCacheFile, serialize($this->m_taglibs));
         }
 
+        //预处理视图参数(抽取模板需要的参数),为后面替换参数的过程加速
+        $this->m_onlyViewParams = $this->preLoadViewParams($view);
+
         //替换参数与标签
         $view=$this->applyView($view,$tagTree);
 
@@ -106,12 +115,32 @@ class HtmlView extends View implements IOutput
     }
 
     /**
+     * 预处理视图参数(把模板需要的参数另存到临时变量)
+     * @param string $view
+     */
+    protected function preLoadViewParams($view)
+    {
+        $pattern="/\\\${([^}]{1,})}/";
+        $matches=[];
+        preg_match_all($pattern, $view,$matches);
+        $params=[];
+        if(count($matches)>0){
+            foreach ($matches[1] as $param){
+                if(!in_array($param, $params)){
+                    $params[]=$param;
+                }
+            }
+        }
+        return $params;
+    }
+
+    /**
      * 替换变量,标签
      * @param string $view
      */
     protected function applyView($view,$tagInfo=[])
     {
-        //替换标签
+        //替换标签(必须先处理标签,否则标签树的位置对应不上)
         $view=$this->loadTags($view,$tagInfo);
 
         //替换变量
@@ -129,8 +158,9 @@ class HtmlView extends View implements IOutput
     {
         //所有标签的信息
         $tagObjs=[];
+        $tagPlaceHolderLen=strlen($this->m_tagPlaceHolder);
         foreach ($tags as $tag){
-            $outerHtml=substr($view, $tag["start"],$tag["end"]-$tag["start"]+strlen($this->m_tagPlaceHolder)+3);
+            $outerHtml=substr($view, $tag["start"],$tag["end"]-$tag["start"]+$tagPlaceHolderLen+3);
             $pos=strpos($outerHtml, ">");
             $innerHtml=substr($outerHtml, $pos+1,strrpos($outerHtml, "<")-$pos-1);
             $attrs=HtmlHelper::getTagAttributes($outerHtml);
@@ -193,10 +223,7 @@ class HtmlView extends View implements IOutput
 
         //从后向前开始替换标签内容
         $tagObjs=array_reverse($tagObjs);
-        $ids=array_keys($tagObjs);
-        for($i=0;$i<count($ids);$i++){
-            $id=$ids[$i];
-            $tag=$tagObjs[$id];
+        foreach ($tagObjs as $tag){
             $obj=$tag["tag"];
             $innerHtml=$tag["innerHtml"];
             $innerHtml=$this->loadParams($innerHtml);
@@ -221,7 +248,6 @@ class HtmlView extends View implements IOutput
                 }
             }
         }
-
         return $view;
     }
 
@@ -231,23 +257,55 @@ class HtmlView extends View implements IOutput
      */
     protected function loadParams($view)
     {
-        foreach($this->m_viewParams as $name=>$value){
-            //替換输出参数
-            if(!is_array($value) && !is_object($value)){
-                //值类型
+        //从视图参数取值填充占位符
+        foreach ($this->m_onlyViewParams as $param){
+            $keys=explode(".", $param);
+            $value=null;
+
+            //取第一个值(第一个值必定是索引数组)
+            $key=$keys[0];
+            if(array_key_exists($key, $this->m_viewParams)){
+                $value=$this->m_viewParams[$key];
+            }
+
+            //迭代取值
+            if(count($keys)>1){
+                for($i=1;$i<count($keys);$i++){
+                    $key=$keys[$i];
+                    if(is_object($value)){
+                        $value=get_object_vars($value);
+                    }
+                    if(array_key_exists($key, $value)){
+                        $value=$value[$key];
+                    }
+                }
+            }
+
+            //替换占位符(非空&&值类型||空字符串)
+            if((!empty($value) && !is_array($value) && !is_object($value))||$value==""){
                 $value=str_replace("$", "\\\$", $value);
-                $view=preg_replace("/\\\${[\s]{0,}".$name."[\s]{0,}}/",$value,$view);
-            }else if(is_array($value)){
-                //数组类型:${paramKey.$key}
-                $view=$this->addArrayViewParams($view, $value,$name);
-            }else if(is_object($value)){
-                //对象类型:${paramKey.$property}
-                $value=get_object_vars($value);
-                $view=$this->addArrayViewParams($view, $value,$name);
-            }else{
-                //$view=preg_replace("/\\\\${[\s]{0,}".$name."[\s]{0,}\}/","%object%@".$name,$view);
+                $view=preg_replace("/\\\${[\s]{0,}".$param."[\s]{0,}}/",$value,$view);
+
             }
         }
+
+        //         foreach($this->m_viewParams as $name=>$value){
+        //             //替換输出参数
+        //             if(!is_array($value) && !is_object($value)){
+        //                 //值类型
+        //                 $value=str_replace("$", "\\\$", $value);
+        //                 $view=preg_replace("/\\\${[\s]{0,}".$name."[\s]{0,}}/",$value,$view);
+        //             }else if(is_array($value)){
+        //                 //数组类型:${paramKey.$key}
+        //                 $view=$this->addArrayViewParams($view, $value,$name);
+        //             }else if(is_object($value)){
+        //                 //对象类型:${paramKey.$property}
+        //                 $value=get_object_vars($value);
+        //                 $view=$this->addArrayViewParams($view, $value,$name);
+        //             }else{
+        //                 //$view=preg_replace("/\\\\${[\s]{0,}".$name."[\s]{0,}\}/","%object%@".$name,$view);
+        //             }
+        //         }
         return $view;
     }
 
