@@ -187,15 +187,34 @@ class HtmlView extends View implements IOutput
                         }
 
                         //匹配动态参数
+//                         $matches=[];
+//                         if(preg_match("/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$value,$matches)>0){
+//                             $paramKey=$matches[1];
+//                             //$value=$this->getUIParams($this->m_tagParams,$paramKey);
+//                             $_value=$this->getUIParams($this->m_tagParams,$paramKey);
+//                             if(!is_array($_value) && !is_object($_value)){
+//                                 $value=str_replace($matches[0], $_value, $value);
+//                             }else{
+//                                 $value=$_value;
+//                             }
+//                         }
+
+                        //匹配动态参数(modified@2018-4-20,修改可以匹配多个参数)
                         $matches=[];
-                        if(preg_match("/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$value,$matches)>0){
-                            $paramKey=$matches[1];
-                            //$value=$this->getUIParams($this->m_tagParams,$paramKey);
-                            $_value=$this->getUIParams($this->m_tagParams,$paramKey);
-                            if(!is_array($_value) && !is_object($_value)){
-                                $value=str_replace($matches[0], $_value, $value);
-                            }else{
-                                $value=$_value;
+                        if(preg_match_all("/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$value,$matches)){
+                            $holders=$matches[0];
+                            $keys=$matches[1];
+                            for($i=0;$i<count($keys);$i++){
+                                $key=$keys[$i];
+                                $_value=$this->getUIParams($this->m_tagParams,$key);
+                                if(!is_array($_value) && !is_object($_value)){
+                                    $holder=$holders[$i];
+                                    $value=str_replace($holder, $_value, $value);
+                                }else{
+                                    //取出来的值为对象或数组,则忽略后面的参数
+                                    $value=$_value;
+                                    break;
+                                }
                             }
                         }
 
