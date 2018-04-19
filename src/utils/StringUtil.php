@@ -149,5 +149,27 @@ class StringUtil
         $data = mb_convert_encoding($data,$to,$encoded);
         return $data;
     }
+
+    /**
+     * 把键值对数组拼装成url参数字符串
+     * @param array $params     键值对数组
+     * @param string|array $removeKey 移除的键
+     */
+    public static function joinUrlParams($params=[],$removeKeys=[])
+    {
+        if(!is_array($removeKeys)){
+            $removeKeys=[$removeKeys];
+        }
+        $url="";
+        foreach ($params as $k=>$v){
+            if(!in_array($k, $removeKeys)){
+                $url.="&".$k."=".urlencode($v);
+            }
+        }
+        if(!empty($url)){
+            $url=substr($url, 1);
+        }
+        return $url;
+    }
 }
 
