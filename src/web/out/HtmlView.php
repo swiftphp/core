@@ -291,11 +291,13 @@ class HtmlView extends View implements IOutput
             if(count($keys)>1){
                 for($i=1;$i<count($keys);$i++){
                     $key=$keys[$i];
-                    if(is_object($value)){
-                        $value=get_object_vars($value);
-                    }
-                    if(array_key_exists($key, $value)){
-                        $value=$value[$key];
+                    if(!is_null($value)){
+                        if(is_object($value)){
+                            $value=get_object_vars($value);
+                        }
+                        if(array_key_exists($key, $value)){
+                            $value=$value[$key];
+                        }
                     }
                 }
             }
