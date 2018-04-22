@@ -94,7 +94,7 @@ class SecurityUtil
      */
     public static function encryptPassword($input)
     {
-        $rndStr=strtolower(AppUtil::getRandomString(32));
+        $rndStr=strtolower(self::getRandomString(32));
         $mixedStr=$rndStr.$input;
         return $rndStr.md5($mixedStr);
     }
