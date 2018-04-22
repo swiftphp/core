@@ -303,7 +303,7 @@ class HtmlView extends View implements IOutput
             }
 
             //替换占位符(非空&&值类型||空字符串)
-            if((!empty($value) && !is_array($value) && !is_object($value))||$value==""){
+            if((!is_array($value) && !is_object($value))){
                 $value=str_replace("$", "\\\$", $value);
                 $view=preg_replace("/\\\${[\s]{0,}".$param."[\s]{0,}}/",$value,$view);
 
