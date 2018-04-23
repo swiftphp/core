@@ -11,10 +11,10 @@ use swiftphp\core\data\types\Type;
 class MysqlConfig extends Config
 {
     /**
-     * 映射缓存.键为表明,值为Table对象
+     * 映射缓存.键为表名,值为Table对象
      * @var array
      */
-    private static $m_tableCache=[];
+    private $m_tableCache=[];
 
     /**
      * 映射数据库字段方法
@@ -24,8 +24,8 @@ class MysqlConfig extends Config
     public function mappingColumns(&$table)
     {
         //from cache
-        if(array_key_exists($table->getName(), self::$m_tableCache)){
-            $table=self::$m_tableCache[$table->getName()];
+        if(array_key_exists($table->getName(), $this->m_tableCache)){
+            $table=$this->m_tableCache[$table->getName()];
             return;
         }
 
@@ -63,7 +63,7 @@ class MysqlConfig extends Config
             //添加到表对象
             $table->addColumn($fieldName, $column);
         }
-        self::$m_tableCache[$table->getName()]=$table;
+        $this->m_tableCache[$table->getName()]=$table;
     }
 
     /**

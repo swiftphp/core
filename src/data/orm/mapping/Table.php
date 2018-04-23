@@ -68,7 +68,13 @@ class Table
      * 一对多集合关联查询模型集.键为实体集合字段名，值为模型实例
      * @var array
      */
-    private $m_setJoins = [];
+    private $m_oneToManyJoins = [];
+
+    /**
+     * 多对一模型集合
+     * @var array
+     */
+    private $m_manyToOneJoins=[];
 
     /**
      * 关联删除模型集
@@ -209,7 +215,6 @@ class Table
         return null;
     }
 
-
     /**
      * 关联查询模型
      * @return SelectJoin
@@ -232,19 +237,105 @@ class Table
      * 一对多集合关联查询模型集.键为实体集合字段名，值为模型实例
      * @return array
      */
-    public function getSetJoins()
+    public function getOneToManyJoins()
     {
-        return $this->m_setJoins;
+        return $this->m_oneToManyJoins;
     }
 
     /**
      * 一对多集合关联查询模型集.键为实体集合字段名，值为模型实例
      * @param array $value
      */
-    public function setSetJoins(array $value)
+    public function setOneToManyJoins(array $value)
     {
-        $this->m_setJoins = $value;
+        $this->m_oneToManyJoins = $value;
     }
+
+    /**
+     * 一对多集合关联查询模型集.键为实体集合字段名，值为模型实例
+     * @param string $name
+     * @param OneToManyJoin $value
+     */
+    public function addOneToManyJoin($name, OneToManyJoin $value)
+    {
+        $this->m_oneToManyJoins[$name] = $value;
+    }
+
+    /**
+     * 根据属性名获取集合关联查询模型
+     * @param string $name
+     * @return OneToManyJoin
+     */
+    public function getOneToManyJoin($name)
+    {
+        if (array_key_exists($name, $this->m_oneToManyJoins))
+            return $this->m_oneToManyJoins[$name];
+            return null;
+    }
+
+    /**
+     * 根据实体属性名移除集合关联型
+     * @param string $name
+     */
+    public function removeOneToManyJoin($name)
+    {
+        if(array_key_exists($name, $this->m_oneToManyJoins)){
+            unset($this->m_oneToManyJoins[$name]);
+        }
+    }
+
+
+    /**
+     * 多对一关联查询模型集.键为实体集合字段名，值为模型实例
+     * @return array
+     */
+    public function getManyToOneJoins()
+    {
+        return $this->m_manyToOneJoins;
+    }
+
+    /**
+     * 多对一关联查询模型集.键为实体集合字段名，值为模型实例
+     * @param array $value
+     */
+    public function setManyToOneJoins(array $value)
+    {
+        $this->m_manyToOneJoins = $value;
+    }
+
+    /**
+     * 多对一关联查询模型集.键为实体集合字段名，值为模型实例
+     * @param string $name
+     * @param ManyToOneJoin $value
+     */
+    public function addManyToOneJoin($name, ManyToOneJoin $value)
+    {
+        $this->m_manyToOneJoins[$name] = $value;
+    }
+
+    /**
+     * 根据属性名获取多对一关联查询模型
+     * @param string $name
+     * @return ManyToOneJoin
+     */
+    public function getManyToOneJoin($name)
+    {
+        if (array_key_exists($name, $this->m_manyToOneJoins))
+            return $this->m_manyToOneJoins[$name];
+            return null;
+    }
+
+    /**
+     * 根据实体属性名移除多对一关联型
+     * @param string $name
+     */
+    public function removeManyToOneJoin($name)
+    {
+        if(array_key_exists($name, $this->m_manyToOneJoins)){
+            unset($this->m_manyToOneJoins[$name]);
+        }
+    }
+
 
     /**
      * 关联删除模型集
@@ -262,39 +353,6 @@ class Table
     public function setDeleteJoins(array $value)
     {
         $this->m_deleteJoins= $value;
-    }
-
-    /**
-     * 一对多集合关联查询模型集.键为实体集合字段名，值为模型实例
-     * @param string $name
-     * @param SetJoin $value
-     */
-    public function addSetJoin($name, SetJoin $value)
-    {
-        $this->m_setJoins[$name] = $value;
-    }
-
-    /**
-     * 根据属性名获取集合关联查询模型
-     * @param string $name
-     * @return SetJoin
-     */
-    public function getSetJoin($name)
-    {
-        if (array_key_exists($name, $this->m_setJoins))
-            return $this->m_setJoins[$name];
-            return null;
-    }
-
-    /**
-     * 根据实体属性名移除集合关联型
-     * @param string $name
-     */
-    public function removeSetJoin($name)
-    {
-        if(array_key_exists($name, $this->m_setJoins)){
-            unset($this->m_setJoins[$name]);
-        }
     }
 
     /**

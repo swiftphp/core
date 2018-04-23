@@ -175,6 +175,33 @@ abstract class Config implements IConfigurable
     }
 
     /**
+     *
+     * @param string|object $class
+     * @return Table
+     */
+    public function getTable($class)
+    {
+        if (is_object($class))
+            $class = get_class($class);
+        if (array_key_exists($class, $this->m_tables))
+            return $this->m_tables[$class];
+        return null;
+    }
+
+    /**
+     * 映射数据库字段抽象方法,由具体数据库配置实例实现
+     * @param Table $table
+     */
+    public abstract function mappingColumns(&$table);
+
+    /**
+     * 映射数据库字段类型
+     * @param string $sqlType 数据库字段类型
+     * @return string
+     */
+    public abstract function mappingType($sqlType);
+
+    /**
      * ORM映射
      * @return \swiftphp\core\data\orm\mapping\Table[]
      */
@@ -218,8 +245,11 @@ abstract class Config implements IConfigurable
             // mapping select
             $this->mappingSelect($table, $obj);
 
-            // mapping sets
-            $this->mappingSets($table, $class, $obj);
+            // mapping one to many
+            $this->mappingOneToManys($table, $class, $obj);
+
+            // mapping one to many
+            $this->mappingManyToOne($table, $class,$namespace, $obj);
 
             // mapping dels
             $this->mappingDels($table, $obj);
@@ -230,27 +260,12 @@ abstract class Config implements IConfigurable
         return $mapping;
     }
 
-
-    /**
-     *
-     * @param string|object $class
-     * @return Table
-     */
-    public function getTable($class)
-    {
-        if (is_object($class))
-            $class = get_class($class);
-        if (array_key_exists($class, $this->m_tables))
-            return $this->m_tables[$class];
-        return null;
-    }
-
     /**
      *
      * @param table $table
      * @param string $xml
      */
-    protected function mappingSelect(&$table, $xml)
+    protected function mappingSelect($table, $xml)
     {
         // set nodes
         $obj = $xml->getElementsByTagName("select");
@@ -283,9 +298,9 @@ abstract class Config implements IConfigurable
      * @param string $xml
      * @return void
      */
-    protected function mappingSets(&$table, $class, $xml)
+    protected function mappingOneToManys($table, $class, $xml)
     {
-        $objs = $xml->getElementsByTagName("sets");
+        $objs = $xml->getElementsByTagName("one-to-many");
         if ($objs->length > 0) {
             $objs = $objs->item(0)->getElementsByTagName("set");
             foreach ($objs as $obj) {
@@ -295,7 +310,7 @@ abstract class Config implements IConfigurable
                     $sync = $obj->getAttribute("sync"); // 该标签放在主关联表表示同步insert,update
                     $order = $obj->getAttribute("order");
 
-                    $set = new SetJoin();
+                    $set = new OneToManyJoin();
                     $set->setColumns($cols);
                     $set->setSync($sync);
                     $set->setOrder($order);
@@ -324,7 +339,55 @@ abstract class Config implements IConfigurable
                         $join->setOn($on);
                         $set->addJoin($tbl, $join);
                     }
-                    $table->addSetJoin($name, $set);
+                    $table->addOneToManyJoin($name, $set);
+                }
+            }
+        }
+    }
+
+    /**
+     * 多对一映射
+     * @param Table $table      表对象
+     * @param string $class     主模型类全名
+     * @param string $namespace 类命名空间前缀
+     * @param string $xml       节点xml文档
+     */
+    protected function mappingManyToOne($table,$class,$namespace,$xml)
+    {
+        //配置:<entity name="category" class="ProdCategory" table="pro_category" alias="c" on="c.id=p.category_id" columns="*" />
+        //其中table可选,没有配置时使用类名从配置查询;columns只对查询有效
+        $objs = $xml->getElementsByTagName("many-to-one");
+        if ($objs->length > 0) {
+            $objs = $objs->item(0)->getElementsByTagName("entity");
+            foreach ($objs as $obj) {
+                $name = $obj->getAttribute("name");
+                if (property_exists($class, $name)) {
+                    $_class=$obj->getAttribute("class");
+                    $_class = trim($namespace, "\\") . "\\" . trim($_class, "\\");
+                    $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : $obj->getAttribute("alias") . ".*";
+                    $tbl=$obj->hasAttribute("table") ? $obj->getAttribute("table"):"";
+                    $alias = $obj->hasAttribute("alias") ? $obj->getAttribute("alias"):"";
+                    if(empty($alias)){
+                        if(!empty($tbl)){
+                            $alias="_".$tbl;
+                        }else{
+                            $clsName=$_class;
+                            $pos=strrpos($clsName, "\\");
+                            if($pos>0){
+                                $alias=substr($clsName, $pos+1);
+                            }
+                        }
+                    }
+                    $on = $obj->getAttribute("on");
+
+                    //add join to table
+                    $bean=new ManyToOneJoin();
+                    $bean->setClass($_class);
+                    $bean->setColumns($cols);
+                    $bean->setTable($tbl);
+                    $bean->setAlias($alias);
+                    $bean->setOn($on);
+                    $table->addManyToOneJoin($name,$bean);
                 }
             }
         }
@@ -335,7 +398,7 @@ abstract class Config implements IConfigurable
      * @param table $table
      * @param string $xml
      */
-    protected function mappingDels(&$table, $xml)
+    protected function mappingDels($table, $xml)
     {
         // set nodes
         $objs = $xml->getElementsByTagName("dels");
@@ -372,17 +435,4 @@ abstract class Config implements IConfigurable
             }
         }
     }
-
-    /**
-     * 映射数据库字段抽象方法,由具体数据库配置实例实现
-     * @param Table $table
-     */
-    public abstract function mappingColumns(&$table);
-
-    /**
-     * 映射数据库字段类型
-     * @param string $sqlType 数据库字段类型
-     * @return string
-     */
-    public abstract function mappingType($sqlType);
 }
