@@ -970,32 +970,10 @@ class Dao implements IConfigurable
             }
 
             // fields
-            $fields = "";
-            $fds = explode(",", $_fields);
-            foreach ($fds as $fd) {
-                if (strpos($fd, ".") === false){
-                    $fd = $alias . "." . $fd;
-                }
-                if ($fields != ""){
-                    $fields .= ",";
-                }
-                    $fields .= $fd;
-            }
+            $fields = $this->addAliasToFieldExp($_fields, $alias);
 
             // group
-            $_group = "";
-            if (trim($groupBy) != "") {
-                $fds = explode(",", $groupBy);
-                foreach ($fds as $fd) {
-                    if (strpos($fd, ".") === false){
-                        $fd = $alias . "." . $fd;
-                    }
-                    if ($_group != ""){
-                        $_group .= ",";
-                    }
-                    $_group .= $fd;
-                }
-            }
+            $_group = $this->addAliasToFieldExp($groupBy, $alias);
             if (trim($_group) != "")
                 $sql .= " GROUP BY " . $_group;
 
@@ -1005,19 +983,7 @@ class Dao implements IConfigurable
             }
 
             // order
-            $_order = "";
-            if (trim($sort) != "") {
-                $fds = explode(",", $sort);
-                foreach ($fds as $fd) {
-                    if (strpos($fd, ".") === false){
-                        $fd = $alias . "." . $fd;
-                    }
-                    if ($_order != ""){
-                        $_order .= ",";
-                    }
-                    $_order .= $fd;
-                }
-            }
+            $_order = $this->addAliasToFieldExp($sort, $alias);
             if (trim($_order) != ""){
                 $sql .= " ORDER BY " . $_order;
             }
@@ -1243,5 +1209,30 @@ class Dao implements IConfigurable
         }
 
         return $expression;
+    }
+
+    /**
+     * 添加表前缀名到字段表达式
+     * @param string $exp
+     * @param string $alias
+     * @return string
+     */
+    private function addAliasToFieldExp($exp,$alias)
+    {
+        if(trim($exp)==""){
+            return "";
+        }
+        $_exp="";
+        $fds = explode(",", $exp);
+        foreach ($fds as $fd) {
+            if (strpos($fd, ".") === false){
+                $fd = $alias . "." . $fd;
+            }
+            if ($_exp != ""){
+                $_exp .= ",";
+            }
+            $_exp .= $fd;
+        }
+        return $_exp;
     }
 }

@@ -35,6 +35,12 @@ abstract class Config implements IConfigurable
     protected $m_debug = false;
 
     /**
+     * 应用根目录
+     * @var string
+     */
+    protected $m_baseDir="";
+
+    /**
      * 缓存管理器
      * @var ICacher
      */
@@ -71,6 +77,15 @@ abstract class Config implements IConfigurable
     public function setDebug($value)
     {
         $this->m_debug = $value;
+    }
+
+    /**
+     * 设置应用根目录
+     * @param string $value
+     */
+    public function setBaseDir($value)
+    {
+        $this->m_baseDir=$value;
     }
 
     /**
@@ -165,9 +180,16 @@ abstract class Config implements IConfigurable
      */
     protected function loadMapping()
     {
+        //mapping file
+        $mappingFile=$this->m_mapping_file;
+        if(!empty($this->m_baseDir)){
+            $mappingFile=Path::combinePath($this->m_baseDir, $mappingFile);
+        }else if(!empty($this->m_config)){
+            $mappingFile=Path::combinePath($this->m_config->getBaseDir(), $mappingFile);
+        }
+
         // load from xml file
         $xmlDoc = new \DOMDocument();
-        $mappingFile=Path::combinePath($this->m_config->getBaseDir(), $this->m_mapping_file);
         $xmlDoc->load($mappingFile);
 
         // namespace
