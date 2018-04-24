@@ -1089,6 +1089,54 @@ class Dao implements IConfigurable
     }
 
     /**
+     * 数据聚合统计(函数名必须与对应的数据库一致)
+     * @param string|object $modelClass  模型类名或实例
+     * @param string $filter             过滤表达式
+     * @param string $sort               排序表达式
+     * @param array $funcMap             统计函数,键为函数名,值为统计字段;至少包含一个元素
+     * @param array $groupFields         分组统计字段,可选
+     */
+    public function group($modelClass,$filter = "",$sort="",$funcMap=[],$groupFields=[])
+    {
+        if(empty($funcMap)){
+            return false;
+        }
+        $table=$this->getOrmConfig()->getTable($modelClass);
+        $sql="";
+        $groupBy="";
+        foreach ($funcMap as $func=>$fd){
+            if(!empty($sql)){
+                $sql.=",";
+            }
+            $sql.=$func."(".$table->getAlias().".".$fd.") AS ".$fd;
+        }
+        foreach ($groupFields as $fd){
+            if(!empty($sql)){
+                $sql.=",";
+            }
+            $sql.=$table->getAlias().".".$fd;
+            if(!empty($groupBy)){
+                $groupBy.=",";
+            }
+            $groupBy.=$fd;
+        }
+
+
+        $sql="SELECT ".$sql." FROM ".$table->getName()." ".$table->getAlias();
+        if(!empty($filter)){
+            $sql.=" WHERE ".$filter;
+        }
+        if(!empty($groupBy)){
+            $sql.=" GROUP BY ".$groupBy;
+        }
+        if(!empty($sort)){
+            $sql.=" ORDER BY ".$sort;
+        }
+        $sql=$this->mapSqlExpression($modelClass, $sql);
+        return $this->getDatabase()->query($sql);
+    }
+
+    /**
      * 原生SQL执行
      * @param unknown $sql
      */
