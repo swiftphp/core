@@ -10,8 +10,6 @@ use swiftphp\core\utils\StringUtil;
 use swiftphp\core\utils\Convert;
 use swiftphp\core\data\types\Type;
 use swiftphp\core\data\orm\mapping\Table;
-use swiftphp\core\data\orm\mapping\ManyToOneJoin;
-use swiftphp\core\utils\SecurityUtil;
 use swiftphp\core\data\orm\mapping\Column;
 
 /**
@@ -1385,12 +1383,15 @@ class Dao implements IConfigurable
         foreach ($manyToOneJoins as $name=>$join){
             $_table=$join->getTable();
             $_alias=$join->getAlias();
-            if(empty($_table)){
+            if(empty($_table) && !empty($join->getClass())){
                 $_table=$this->getOrmConfig()->getTable($join->getClass())->getName();
                 //$_alias="_".$_table;
             }
             if(empty($_alias)){
                 $_alias="_".$_table;
+            }
+            if(empty($_table)){
+                continue;
             }
             $joinSql.=" LEFT JOIN ".$_table." ".$_alias." ON ".$join->getOn();
 
