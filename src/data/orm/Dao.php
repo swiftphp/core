@@ -1332,6 +1332,9 @@ class Dao implements IConfigurable
             if(property_exists($model, $name)){
                 //$join=new ManyToOneJoin();//test
                 $class=$join->getClass();
+                if(!class_exists($class)){
+                    continue;
+                }
                 $_table=$join->getTable();
                 if(empty($_table)){
                     $_table=$this->getOrmConfig()->getTable($class)->getName();
@@ -1354,7 +1357,7 @@ class Dao implements IConfigurable
                 $where=" WHERE ".$_alias.".".$onekey."='".$model->$manyKey."'";
 
                 //查询数据库
-                $sql="SELECT ".$_alias.".* FROM ".$join->getTable()." ".$_alias.$where;
+                $sql="SELECT ".$_alias.".* FROM ".$_table." ".$_alias.$where;
                 $reader=$this->getDatabase()->reader($sql);
 
                 //创建一方对象
