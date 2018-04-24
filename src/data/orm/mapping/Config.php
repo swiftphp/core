@@ -364,19 +364,11 @@ abstract class Config implements IConfigurable
                 if (property_exists($class, $name)) {
                     $_class=$obj->getAttribute("class");
                     $_class = trim($namespace, "\\") . "\\" . trim($_class, "\\");
-                    $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : $obj->getAttribute("alias") . ".*";
+                    $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : "*";
                     $tbl=$obj->hasAttribute("table") ? $obj->getAttribute("table"):"";
                     $alias = $obj->hasAttribute("alias") ? $obj->getAttribute("alias"):"";
-                    if(empty($alias)){
-                        if(!empty($tbl)){
-                            $alias="_".$tbl;
-                        }else{
-                            $clsName=$_class;
-                            $pos=strrpos($clsName, "\\");
-                            if($pos>0){
-                                $alias=substr($clsName, $pos+1);
-                            }
-                        }
+                    if(empty($alias)&&!empty($tbl)){
+                        $alias="_".$tbl;
                     }
                     $on = $obj->getAttribute("on");
 

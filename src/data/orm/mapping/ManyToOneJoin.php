@@ -10,32 +10,33 @@ namespace swiftphp\core\data\orm\mapping;
  */
 class ManyToOneJoin
 {
-    /**
-     * 关联节点表名
-     * @var string
-     */
-    private $table;
 
     /**
-     * 关联字段的类型名
-     * @var string
-     */
-    private $class;
-
-    /**
-     * 关联节点表别名
-     * @var string
-     */
-    private $alias;
-
-    /**
-     * 关联条件
+     * 关联条件(必须)
      * @var string
      */
     private $on;
 
     /**
-     * 查询列集表达式
+     * 关联字段的类型名(需要同步load时必须)
+     * @var string
+     */
+    private $class;
+
+    /**
+     * 关联节点表名(需要同步select时必须)
+     * @var string
+     */
+    private $table;
+
+    /**
+     * 关联节点表别名(可选)
+     * @var string
+     */
+    private $alias;
+
+    /**
+     * 查询列集表达式(可选)
      * @var string
      */
     private $columns;

@@ -923,6 +923,8 @@ class Dao implements IConfigurable
                     $sql.=$joinSql;
                 }
                 $sql = str_replace("{COLUMNS}", $fields, $sql);
+//                 echo $sql;
+//                 exit;
             }
         } else {
             //配置映射
@@ -1382,10 +1384,11 @@ class Dao implements IConfigurable
     {
         foreach ($manyToOneJoins as $name=>$join){
             $_table=$join->getTable();
-            if(empty($_table)){
-                $_table=$this->getOrmConfig()->getTable($join->getClass());
-            }
             $_alias=$join->getAlias();
+            if(empty($_table)){
+                $_table=$this->getOrmConfig()->getTable($join->getClass())->getName();
+                //$_alias="_".$_table;
+            }
             if(empty($_alias)){
                 $_alias="_".$_table;
             }
