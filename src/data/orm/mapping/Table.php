@@ -65,6 +65,12 @@ class Table
     private $m_selectJoin = null;
 
     /**
+     * 关联删除模型集
+     * @var array
+     */
+    private $m_deleteJoins = [];
+
+    /**
      * 一对多集合关联查询模型集.键为实体集合字段名，值为模型实例
      * @var array
      */
@@ -75,12 +81,6 @@ class Table
      * @var array
      */
     private $m_manyToOneJoins=[];
-
-    /**
-     * 关联删除模型集
-     * @var array
-     */
-    private $m_deleteJoins = [];
 
     /**
      * 数据库表名
@@ -336,7 +336,6 @@ class Table
         }
     }
 
-
     /**
      * 关联删除模型集
      * @return array
@@ -357,7 +356,7 @@ class Table
 
     /**
      * 添加关联删除模型
-     * @param unknown $name
+     * @param string $name 表名
      * @param DeleteJoin $value
      */
     public function addDeleteJoin($name, DeleteJoin $value)

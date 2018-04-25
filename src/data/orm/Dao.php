@@ -11,6 +11,8 @@ use swiftphp\core\utils\Convert;
 use swiftphp\core\data\types\Type;
 use swiftphp\core\data\orm\mapping\Table;
 use swiftphp\core\data\orm\mapping\Column;
+use swiftphp\core\data\orm\mapping\Join;
+use swiftphp\core\data\orm\mapping\ManyToOneJoin;
 
 /**
  * 数据DAO
@@ -820,6 +822,8 @@ class Dao implements IConfigurable
         $sql = "DELETE " . $alias . " FROM " . $table . " " . $alias . " WHERE " . $filter;
         $sql_array[] = $sql;
         $intRows = - 1;
+//         var_dump($sql_array);
+//         exit;
         foreach ($sql_array as $sql) {
             $intRows = $this->getDatabase()->execute($sql);
             if ($intRows === false){
@@ -923,6 +927,14 @@ class Dao implements IConfigurable
                 $sql = str_replace("{COLUMNS}", $fields, $sql);
 //                 echo $sql;
 //                 exit;
+                if (trim($groupBy) != ""){
+                    $sql .= " GROUP BY " . $this->addAliasToFieldExp($groupBy, $alias);
+                }
+                if (trim($sort) != ""){
+                    $sql .= " ORDER BY " . $this->addAliasToFieldExp($sort, $alias);
+                }
+//                 echo $sql;
+//                 exit;
             }
         } else {
             //配置映射
@@ -986,7 +998,6 @@ class Dao implements IConfigurable
         $sql=$this->mapSqlExpression($modelClass, $sql);
 //                     echo $sql."\r\n";
 //                     exit;
-
         $rs = $this->getDatabase()->query($sql, $offset, $length);
 
 
@@ -1000,7 +1011,7 @@ class Dao implements IConfigurable
                     if(array_key_exists($key, $manyToOneFieldMap)){
                         //many2one的字段
                         $map=$manyToOneFieldMap[$key];
-                        $name=$map["name"];
+                        $name=$map["target"];
                         $fd=$map["field"];
                         if(!array_key_exists($name, $many2one)){
                             $many2one[$name]=[];
@@ -1341,7 +1352,7 @@ class Dao implements IConfigurable
                 if (! empty($order)){
                     $sql .= " order by " . $order;
                 }
-                // echo $sql."\r\n";
+                //echo $sql."\r\n";
                 // exit;
                 $_sets = $this->getDatabase()->query($sql);
                 if(count($_sets)>0){
@@ -1372,53 +1383,66 @@ class Dao implements IConfigurable
     private function loadManyToOneJoins($model,Table $tableObj)
     {
         $manyToOnes=$tableObj->getManyToOneJoins();
-        $table=$tableObj->getName();
-        $alias=$tableObj->getAlias();
-        $alias=empty($alias)?"_".$table:$alias;
+        foreach ($manyToOnes as $name=>$many2one){
+            //$many2one=new ManyToOneJoin();//test
+            //字段类型名
+            $class=$many2one->getClass();
+            if(empty($class)||!class_exists($class)){
+                continue;
+            }
 
-        foreach ($manyToOnes as $name => $join) {
-            if(property_exists($model, $name)){
-                //$join=new ManyToOneJoin();//test
-                $class=$join->getClass();
-                if(!class_exists($class)){
-                    continue;
+            //目标表对象
+            $targetTableObj=$this->getOrmConfig()->getTable($class);
+            if(empty($targetTableObj)||empty($targetTableObj->getName())){
+                continue;
+            }
+            $joins=$many2one->getJoins();
+            if(empty($joins)){
+                continue;
+            }
+
+            //sql
+            $sql="SELECT {TARGET_ALIAS}.*"." FROM " . $tableObj->getName() . " " . $tableObj->getAlias();
+
+            //join tables
+            $alias=$targetTableObj->getAlias();
+            foreach ($joins as $join){
+                //$join=new Join();//test
+                $sql.=" LEFT JOIN ".$join->getTable()." ".$join->getAlias()." ON ".$join->getOn();
+                if($join->getTable()==$targetTableObj->getName()){
+                    $alias=$join->getAlias();
                 }
-                $_table=$join->getTable();
-                if(empty($_table)){
-                    $_table=$this->getOrmConfig()->getTable($class)->getName();
+            }
+            $sql=str_replace("{TARGET_ALIAS}", $alias, $sql);
+
+
+            //主表的过滤
+            $filter = "";
+            foreach ($tableObj->getPrimaryKeys() as $keyField) {
+                $field=$this->mapModelField($model, $keyField);
+                if ($filter != ""){
+                    $filter .= " AND ";
                 }
-                $_alias=$join->getAlias();
-                if(empty($_alias)){
-                    $_alias="_".$_table;
+                if(empty($field)){
+                    throw new \Exception("实体'".get_class($model)."'不包含主键主段'".$keyField."'");
                 }
+                $filter .= $tableObj->getAlias() . "." . $keyField . "='" . $model->$field. "'";
+            }
+            $sql .= " WHERE " . $filter;
 
-                //从on从拆分主表的关联字段(或外键),附表的搜索字段
-                $manyKey="";   //多方(主表)中的关联键(外键)
-                $onekey="";   //一方(父表)的搜索字段(主键)
-                $this->matchKeys($join->getOn(), $table, $alias, $_table, $_alias, $manyKey, $onekey);
-                $manyKey = $this->mapModelField($model, $manyKey);
-                if(empty($manyKey)||empty($onekey)||!property_exists($model, $manyKey)){
-                    continue;
-                }
-
-                //搜索条件
-                $where=" WHERE ".$_alias.".".$onekey."='".$model->$manyKey."'";
-
-                //查询数据库
-                $sql="SELECT ".$_alias.".* FROM ".$_table." ".$_alias.$where;
-                $reader=$this->getDatabase()->reader($sql);
-
+            //查询数据库
+            $reader=$this->getDatabase()->reader($sql);
+            if ($reader && is_null($this->getDatabase()->getException())) {
                 //创建一方对象
                 $model->$name=new $class();
-                if ($reader && is_null($this->getDatabase()->getException())) {
-                    foreach ($reader as $fieldName=> $value) {
-                        $field=$this->mapModelField($model->$name, $fieldName);
-                        if(!empty($field)){
-                            $model->$name->$field= $value;
-                        }
+                foreach ($reader as $fieldName=> $value) {
+                    $field=$this->mapModelField($model->$name, $fieldName);
+                    if(!empty($field)){
+                        $model->$name->$field= $value;
                     }
                 }
             }
+
         }
     }
 
@@ -1431,55 +1455,83 @@ class Dao implements IConfigurable
      */
     private function selectManyToOneJoins($manyToOneJoins,&$columns,&$joinSql,&$manyToOneFieldMap)
     {
-        foreach ($manyToOneJoins as $name=>$join){
-            $_table=$join->getTable();
-            $_alias=$join->getAlias();
-            if(empty($_table) && !empty($join->getClass())){
-                $_table=$this->getOrmConfig()->getTable($join->getClass())->getName();
-                //$_alias="_".$_table;
-            }
-            if(empty($_alias)){
-                $_alias="_".$_table;
-            }
-            if(empty($_table)){
+        $tableMap=[];//alias:tableName
+        $colMap=[];//alias:[fields]
+        foreach ($manyToOneJoins as $name=>$many2one){
+            //$many2one=new ManyToOneJoin();//test
+            $joins=$many2one->getJoins();
+            if(count($joins)==0){
                 continue;
             }
-            $joinSql.=" LEFT JOIN ".$_table." ".$_alias." ON ".$join->getOn();
 
-            //cols
+            //join sql
+            $firstAlias="";
+            foreach ($joins as $join){
+                //$join=new Join();//test
+                //join sql
+                $_table=$join->getTable();
+                $_alias=$join->getAlias();
+                if(!array_key_exists($_alias, $tableMap)){
+                    $joinSql.=" LEFT JOIN ".$_table." ".$_alias." ON ".$join->getOn();
+                }
+                $tableMap[$_alias]=$_table;
+                if(empty($firstAlias)){
+                    $firstAlias=$_alias;
+                }
+            }
+
+            //列集
             $fds=[];
-            $cols=$join->getColumns();
-            if(empty($cols)||$cols=="*"||$cols==$_alias.".*"){
-                //重新映射字段
-                $_tableObj=new Table();
-                $_tableObj->setName($_table);
-                $this->getOrmConfig()->mappingColumns($_tableObj);
-                foreach ($_tableObj->getColumns() as $col){
-                    $colName="_".$name."_".$col->getName();
-                    $fds[]=$_alias.".".$col->getName()." AS ".$colName;
-                    $manyToOneFieldMap[$colName]=["name"=>$name,"field"=>$col->getName()];
-                }
-                $fds=implode(",", $fds);
-            }else{
+            $cols=$many2one->getColumns();
+            if(!empty($cols)){
                 $cols=explode(",", $cols);
-                foreach ($cols as $c){
-                    $fd=$c;
-                    if(strpos($c, ".")){
-                        $fd=substr($c, strpos($c, ".")+1);
+                foreach ($cols as $col){
+                    $alias="";
+                    $field=$col;
+                    $dotPos=strpos($col, ".");
+                    if($dotPos===false){
+                        $alias=$firstAlias;
+                    }else{
+                        $arr=explode(".", $col);
+                        $alias=$arr[0];
+                        $field=$arr[1];
                     }
-                    $colName="_".$name."_".$fd;
-                    $fds[]=$_alias.".".$fd." AS ".$colName;
-                    $manyToOneFieldMap[$colName]=["name"=>$name,"field"=>$fd];
+
+                    //展开星号字段
+                    if($field=="*"){
+                        //重新映射列名
+                        if(!array_key_exists($alias, $colMap)){
+                            $_tableObj=new Table();
+                            $_tableObj->setName($tableMap[$alias]);
+                            $this->getOrmConfig()->mappingColumns($_tableObj);
+                            $colMap[$alias]=[];
+                            foreach ($_tableObj->getColumns() as $c){
+                                $colMap[$alias][]=$c->getName();
+                            }
+                        }
+
+                        //提取所有的列名
+                        foreach ($colMap[$alias] as $fd){
+                            $colName="_".$name."_".$fd;//数据库真实输出的列名
+                            $fds[]=$alias.".".$fd." AS ".$colName;
+                            $manyToOneFieldMap[$colName]=["target"=>$name,"field"=>$fd];
+                        }
+
+                    }else{
+                        $colName="_".$name."_".$field;
+                        $fds[]=$alias.".".$field." AS ".$colName;
+                        $manyToOneFieldMap[$colName]=["target"=>$name,"field"=>$field];
+                    }
                 }
-                $fds=implode(",", $fds);
             }
-            if(!empty($columns)){
-                $columns.=",";
+            if(!empty($fds)){
+                if(!empty($columns)){
+                    $columns.=",";
+                }
+                $columns.=implode(",", $fds);
             }
-            $columns.=$fds;
         }
     }
-
 
     /**
      * 添加表前缀名到字段表达式

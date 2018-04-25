@@ -8,56 +8,13 @@ namespace swiftphp\core\data\orm\mapping;
  * @author Tomix
  *
  */
-class ManyToOneJoin
+class ManyToOneJoin extends QueryJoinCollection
 {
-
-    /**
-     * 关联条件(必须)
-     * @var string
-     */
-    private $on;
-
     /**
      * 关联字段的类型名(需要同步load时必须)
      * @var string
      */
-    private $class;
-
-    /**
-     * 关联节点表名(需要同步select时必须)
-     * @var string
-     */
-    private $table;
-
-    /**
-     * 关联节点表别名(可选)
-     * @var string
-     */
-    private $alias;
-
-    /**
-     * 查询列集表达式(可选)
-     * @var string
-     */
-    private $columns;
-
-    /**
-     * 获取关联节点表名
-     * @return string
-     */
-    public function getTable()
-    {
-        return $this->table;
-    }
-
-    /**
-     * 关联节点表名
-     * @param string $value
-     */
-    public function setTable($value)
-    {
-        $this->table=$value;
-    }
+    protected $class;
 
     /**
      * 获取关联字段的类型名
@@ -75,60 +32,6 @@ class ManyToOneJoin
     public function setClass($value)
     {
         $this->class=$value;
-    }
-
-    /**
-     * 关联节点表别名
-     * @return string
-     */
-    public function getAlias()
-    {
-        return $this->alias;
-    }
-
-    /**
-     * 关联节点表别名
-     * @param string $value
-     */
-    public function setAlias($value)
-    {
-        $this->alias=$value;
-    }
-
-    /**
-     * 关联条件
-     * @return string
-     */
-    public function getOn()
-    {
-        return $this->on;
-    }
-
-    /**
-     * 关联条件
-     * @param string $value
-     */
-    public function setOn($value)
-    {
-        $this->on=$value;
-    }
-
-    /**
-     * 获取查询列集表达式
-     * @return string
-     */
-    public function getColumns()
-    {
-        return $this->columns;
-    }
-
-    /**
-     * 设置查询列集表达式
-     * @param string $value
-     */
-    public function setColumns($value)
-    {
-        $this->columns=$value;
     }
 }
 

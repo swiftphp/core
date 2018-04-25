@@ -7,6 +7,7 @@ use swiftphp\core\system\ICacher;
 use swiftphp\core\config\IConfigurable;
 use swiftphp\core\config\IConfiguration;
 use swiftphp\core\io\Path;
+use swiftphp\core\utils\SecurityUtil;
 
 /**
  * ORM配置抽象类
@@ -124,7 +125,6 @@ abstract class Config implements IConfigurable
         $this->m_mapping_file = $value;
     }
 
-
     /**
      * 数据库实例
      * @param IDatabase $value
@@ -133,7 +133,6 @@ abstract class Config implements IConfigurable
     {
         $this->m_database = $value;
     }
-
 
     /**
      * 日志管理器
@@ -243,19 +242,22 @@ abstract class Config implements IConfigurable
             $this->mappingColumns($table);
 
             // mapping select
-            $this->mappingSelect($table, $obj);
-
-            // mapping one to many
-            $this->mappingOneToManys($table, $class, $obj);
-
-            // mapping one to many
-            $this->mappingManyToOne($table, $class,$namespace, $obj);
+            $this->mappingSelectJoin($table, $obj);
 
             // mapping dels
-            $this->mappingDels($table, $obj);
+            $this->mappingDeleteJoins($table, $obj);
+
+            // mapping one to many
+            $this->mappingOneToManyJoins($table, $class, $obj);
+
+            // mapping one to many
+            $this->mappingManyToOneJoins($table, $class,$namespace, $obj);
 
             // add to mapping table set
             $mapping[$class] = $table;
+
+//             var_dump($table);
+//             exit;
         }
         return $mapping;
     }
@@ -265,7 +267,7 @@ abstract class Config implements IConfigurable
      * @param table $table
      * @param string $xml
      */
-    protected function mappingSelect($table, $xml)
+    protected function mappingSelectJoin($table, $xml)
     {
         // set nodes
         $obj = $xml->getElementsByTagName("select");
@@ -274,72 +276,79 @@ abstract class Config implements IConfigurable
             $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : $table->getAlias() . ".*";
             $select = new SelectJoin();
             $select->setColumns($cols);
-
-            // joins
-            $_objs = $obj->getElementsByTagName("join");
-            foreach ($_objs as $_obj) {
-                $joinTable = $_obj->getAttribute("table");
-                $alias = $_obj->hasAttribute("alias") ? $_obj->getAttribute("alias") : "_" . $joinTable;
-                $on = $_obj->getAttribute("on");
-                $join = new Join();
-                $join->setTable($joinTable);
-                $join->setAlias($alias);
-                $join->setOn($on);
-                $select->addJoin($joinTable, $join);
-            }
+            $this->mappingJoins($select, $obj);
             $table->setSelectJoin($select);
         }
     }
 
     /**
-     *
+     * 映射关联删除
+     * 1.关联删除的主表必须放在<del>标识内的第一个join或放在<del>标记属性
+     * 2.删除顺序必须按从子向父级配置
+     * @param table $table
+     * @param string $xml
+     */
+    protected function mappingDeleteJoins($table, $xml)
+    {
+        // set nodes
+        $objs = $xml->getElementsByTagName("dels");
+        if ($objs->length > 0) {
+            $objs = $objs->item(0)->getElementsByTagName("del");
+            foreach ($objs as $obj) {
+                $del = new DeleteJoin();
+                $this->mappingJoins($del, $obj);
+                $tbl = $obj->getAttribute("table");
+                if(empty($tbl)){
+                    $joins=$del->getJoins();
+                    if(count($joins)>0){
+                        $tbl=array_values($joins)[0]->getTable();
+                    }
+                }
+                if(!empty($tbl)){
+                    $table->addDeleteJoin($tbl, $del);
+                }
+            }
+        }
+    }
+
+    /**
+     * 映射一对多
+     * 多个join必须按照关联逻辑顺序配置
      * @param table $table
      * @param string $class
      * @param string $xml
      * @return void
      */
-    protected function mappingOneToManys($table, $class, $xml)
+    protected function mappingOneToManyJoins($table, $class, $xml)
     {
         $objs = $xml->getElementsByTagName("one-to-many");
         if ($objs->length > 0) {
-            $objs = $objs->item(0)->getElementsByTagName("set");
+            $objs = $objs->item(0)->getElementsByTagName("many");
             foreach ($objs as $obj) {
                 $name = $obj->getAttribute("name");
                 if (property_exists($class, $name)) {
-                    $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : $obj->getAttribute("alias") . ".*";
+                    $many = new OneToManyJoin();
+                    $this->mappingJoins($many, $obj);
+
+                    //关联主表别名,如果没有配置到属性,则从第一个join取
+                    $alias=$obj->getAttribute("alias");
+                    if(empty($alias)){
+                        $joins=$many->getJoins();
+                        if(count($joins)>0){
+                            $alias=array_values($joins)[0]->getAlias();
+                        }
+                    }
+
+                    //查询列,同步与排序
                     $sync = $obj->getAttribute("sync"); // 该标签放在主关联表表示同步insert,update
                     $order = $obj->getAttribute("order");
+                    $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : $alias . ".*";
+                    $many->setSync($sync);
+                    $many->setOrder($order);
+                    $many->setColumns($cols);
 
-                    $set = new OneToManyJoin();
-                    $set->setColumns($cols);
-                    $set->setSync($sync);
-                    $set->setOrder($order);
-
-                    // 第一个join元素可以设置为属性
-                    $tbl = $obj->getAttribute("table");
-                    if (! empty($tbl)) {
-                        $alias = $obj->hasAttribute("alias") ? $obj->getAttribute("alias") : "_" . $obj->getAttribute("table");
-                        $on = $obj->getAttribute("on");
-                        $join = new Join();
-                        $join->setTable($tbl);
-                        $join->setAlias($alias);
-                        $join->setOn($on);
-                        $set->addJoin($tbl, $join);
-                    }
-
-                    // joins
-                    $_objs = $obj->getElementsByTagName("join");
-                    foreach ($_objs as $_obj) {
-                        $tbl = $_obj->getAttribute("table");
-                        $alias = $_obj->hasAttribute("alias") ? $_obj->getAttribute("alias") : "_" . $tbl;
-                        $on = $_obj->getAttribute("on");
-                        $join = new Join();
-                        $join->setTable($tbl);
-                        $join->setAlias($alias);
-                        $join->setOn($on);
-                        $set->addJoin($tbl, $join);
-                    }
-                    $table->addOneToManyJoin($name, $set);
+                    //mapping joins
+                    $table->addOneToManyJoin($name, $many);
                 }
             }
         }
@@ -352,79 +361,72 @@ abstract class Config implements IConfigurable
      * @param string $namespace 类命名空间前缀
      * @param string $xml       节点xml文档
      */
-    protected function mappingManyToOne($table,$class,$namespace,$xml)
+    protected function mappingManyToOneJoins($table,$class,$namespace,$xml)
     {
-        //配置:<entity name="category" class="ProdCategory" table="pro_category" alias="c" on="c.id=p.category_id" columns="*" />
-        //其中table可选,没有配置时使用类名从配置查询;columns只对查询有效
         $objs = $xml->getElementsByTagName("many-to-one");
         if ($objs->length > 0) {
-            $objs = $objs->item(0)->getElementsByTagName("entity");
+            $objs = $objs->item(0)->getElementsByTagName("one");
             foreach ($objs as $obj) {
                 $name = $obj->getAttribute("name");
                 if (property_exists($class, $name)) {
+                    $many2one = new ManyToOneJoin();
+                    $this->mappingJoins($many2one, $obj);
+
+                    //关联主表别名,如果没有配置到属性,则从第一个join取
+                    $alias=$obj->getAttribute("alias");
+                    if(empty($alias)){
+                        $joins=$many2one->getJoins();
+                        if(count($joins)>0){
+                            $alias=array_values($joins)[0]->getAlias();
+                        }
+                    }
+
+                    //一方的类型名,用于同步加载数据时实例化
                     $_class=$obj->getAttribute("class");
                     $_class = trim($namespace, "\\") . "\\" . trim($_class, "\\");
-                    $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : "*";
-                    $tbl=$obj->hasAttribute("table") ? $obj->getAttribute("table"):"";
-                    $alias = $obj->hasAttribute("alias") ? $obj->getAttribute("alias"):"";
-                    if(empty($alias)&&!empty($tbl)){
-                        $alias="_".$tbl;
-                    }
-                    $on = $obj->getAttribute("on");
+                    $many2one->setClass($_class);
 
-                    //add join to table
-                    $bean=new ManyToOneJoin();
-                    $bean->setClass($_class);
-                    $bean->setColumns($cols);
-                    $bean->setTable($tbl);
-                    $bean->setAlias($alias);
-                    $bean->setOn($on);
-                    $table->addManyToOneJoin($name,$bean);
+                    //查询列集
+                    $cols = $obj->hasAttribute("columns") ? $obj->getAttribute("columns") : $alias . ".*";
+                    $many2one->setColumns($cols);
+
+                    //mapping joins
+                    $table->addManyToOneJoin($name, $many2one);
                 }
             }
         }
     }
 
     /**
-     *
-     * @param table $table
-     * @param string $xml
+     * 映射join关联集合
+     * @param JoinCollection $joins
+     * @param string $outerXml
      */
-    protected function mappingDels($table, $xml)
+    private function mappingJoins(JoinCollection $joinCollection,$xml)
     {
-        // set nodes
-        $objs = $xml->getElementsByTagName("dels");
-        if ($objs->length > 0) {
-            $objs = $objs->item(0)->getElementsByTagName("del");
-            foreach ($objs as $obj) {
-                $del = new DeleteJoin();
+        // 第一个join元素可以设置为属性
+        $tbl = $xml->getAttribute("table");
+        if (! empty($tbl)) {
+            $alias = $xml->hasAttribute("alias") ? $xml->getAttribute("alias") : "_" . $xml->getAttribute("table");
+            $on = $xml->getAttribute("on");
+            $join = new Join();
+            $join->setTable($tbl);
+            $join->setAlias($alias);
+            $join->setOn($on);
+            $joinCollection->addJoin($tbl, $join);
+        }
 
-                // 第一个join可以设置成属性
-                $tbl = $obj->getAttribute("table");
-                if (! empty($tbl)) {
-                    $alias = $obj->hasAttribute("alias") ? $obj->getAttribute("alias") : "_" . $obj->getAttribute("table");
-                    $on = $obj->getAttribute("on");
-                    $join = new Join();
-                    $join->setAlias($alias);
-                    $join->setTable($tbl);
-                    $join->setOn($on);
-                    $del->addJoin($tbl, $join);
-                }
-
-                // joins
-                $_objs = $obj->getElementsByTagName("join");
-                foreach ($_objs as $_obj) {
-                    $tbl = $_obj->getAttribute("table");
-                    $alias = $_obj->hasAttribute("alias") ? $_obj->getAttribute("alias") : "_" . $tbl;
-                    $on = $_obj->getAttribute("on");
-                    $join = new Join();
-                    $join->setAlias($alias);
-                    $join->setTable($tbl);
-                    $join->setOn($on);
-                    $del->addJoin($tbl, $join);
-                }
-                $table->addDeleteJoin($tbl, $del);
-            }
+        // joins
+        $_objs = $xml->getElementsByTagName("join");
+        foreach ($_objs as $_obj) {
+            $tbl = $_obj->getAttribute("table");
+            $alias = $_obj->hasAttribute("alias") ? $_obj->getAttribute("alias") : "_" . $tbl;
+            $on = $_obj->getAttribute("on");
+            $join = new Join();
+            $join->setTable($tbl);
+            $join->setAlias($alias);
+            $join->setOn($on);
+            $joinCollection->addJoin($tbl, $join);
         }
     }
 }
