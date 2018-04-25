@@ -1558,9 +1558,8 @@ class Dao implements IConfigurable
         return $_exp;
     }
 
-
     /**
-     * 从关联条件分解键名
+     * 从on关联条件分解键名
      * @param string $on
      * @param string $table1
      * @param string $alias1
