@@ -7,7 +7,6 @@ use swiftphp\core\system\ICacher;
 use swiftphp\core\config\IConfigurable;
 use swiftphp\core\config\IConfiguration;
 use swiftphp\core\io\Path;
-use swiftphp\core\utils\SecurityUtil;
 
 /**
  * ORM配置抽象类

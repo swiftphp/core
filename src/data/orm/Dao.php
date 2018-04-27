@@ -12,7 +12,6 @@ use swiftphp\core\data\types\Type;
 use swiftphp\core\data\orm\mapping\Table;
 use swiftphp\core\data\orm\mapping\Column;
 use swiftphp\core\data\orm\mapping\Join;
-use swiftphp\core\data\orm\mapping\ManyToOneJoin;
 
 /**
  * 数据DAO
