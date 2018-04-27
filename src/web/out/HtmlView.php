@@ -94,7 +94,7 @@ class HtmlView extends View implements IOutput
 
         }else{
             //重新处理,并写到缓存文件
-            $view=$this->loadTemplate($view,dirname($viewFile),$tagTree,$this->m_taglibs);
+            $view=$this->loadView($view,dirname($viewFile),$tagTree,$this->m_taglibs);
             file_put_contents($viewCacheFile, $view);
             file_put_contents($tagInfoCacheFile, serialize($tagTree));
             file_put_contents($tagLibInfoCacheFile, serialize($this->m_taglibs));
@@ -333,10 +333,10 @@ class HtmlView extends View implements IOutput
     /**
      * 预处理视图:混合视图的模板与部件,预处理标签信息
      * @param string $view 预先读取的主模板内容
-     * @param string $relDir 模板所在目录
+     * @param string $relDir 模板所在目录(view所在目录)
      * @return string
      */
-    protected function loadTemplate($view,$relDir,&$tagTree=[],&$taglibs=[])
+    protected function loadView($view,$relDir,&$tagTree=[],&$taglibs=[])
     {
         //标签库:<taglib prefix="php" namespace="swiftphp\core\web\tags" />
         //模板标签:<page:template file="" />
@@ -361,39 +361,10 @@ class HtmlView extends View implements IOutput
         }
 
         //模板标签:<page:template file="" />;一个视图最多只存在一个模板
-        $pattern="/<page:template[^>]{1,}file[\s]*=[\s]*[\"|\']([^\s<>\"\']{1,})[\"|\'][^>]*>/i";
-        $matches=[];
-        if(preg_match($pattern,$view,$matches)>0){
-            $templateFile=$matches[1];
-            $templateFile=$relDir."/".$templateFile;
-            if(!file_exists($templateFile) || !is_file($templateFile)){
-                throw new \Exception("Template file '".$matches[1]."' does not exist");
-            }
-            $template=file_get_contents($templateFile);
-            $template=StringUtil::removeUtf8Bom($template);
-            $view=$this->addTemplateToView($template,$view);
-        }
+        $view=$this->loadTemplate($view, $relDir);
 
         //部件标签:<page:part file="" />
-        $pattern="/<page:part[^>]{1,}file[\s]*=[\s]*[\"|\']([^\s<>\"\']{1,})[\"|\'][^>]*>/i";
-        $matches=[];
-        if(preg_match_all($pattern,$view,$matches)>0){
-            $parts=$matches[0];
-            $tpls=$matches[1];
-            for($i=0;$i<count($parts);$i++){
-                $part=$parts[$i];
-                $tpl=$tpls[$i];
-                $tpl=$relDir."/".$tpl;
-
-                $tplHtml="";
-                if(file_exists($tpl) && is_file($tpl)){
-                    $tplHtml=file_get_contents($tpl);
-                }
-                $tplHtml=StringUtil::removeUtf8Bom($tplHtml);
-                //$tplHtml=$this->applyView($tplHtml);
-                $view=str_replace($part, $tplHtml, $view);
-            }
-        }
+        $view=$this->loadParts($view, $relDir);
 
         //标签预处理
         foreach (array_keys($this->m_taglibs) as $prefix){
@@ -434,74 +405,61 @@ class HtmlView extends View implements IOutput
     }
 
     /**
-     * 搜索标签树
-     * @param string $template
+     * 合并到母板视图(一个视图最多只存在一个模板)
+     * @param string $view      视图内容
+     * @param string $relDir    视图所在目录
+     * @throws \Exception
      */
-    private function loadTagTree($template)
+    protected function loadTemplate($view,$relDir)
     {
-        $open="<".$this->m_tagPlaceHolder;
-        $close="</".$this->m_tagPlaceHolder.">";
-
-        //搜索标签起止位置
-        $tagpos=[];
-        $offset=strpos($template, $open);
-        while ($offset>0){
-            //echo $offset."----------------\r\n".substr($template, $offset)."\r\n";
-            $tagpos[$offset]=1;
-            $offset=strpos($template, $open,$offset+1);
-        }
-        $offset=strpos($template, $close);
-        while ($offset>0){
-            //echo $offset."----------------\r\n".substr($template, $offset)."\r\n";
-            $tagpos[$offset]=2;
-            $offset=strpos($template, $close,$offset+1);
-        }
-
-        //配对标签
-        ksort($tagpos);
-        $tags=[];
-        $count=0;
-        $_count=-1;
-        while ($count>$_count)
-        {
-            $count=count($tagpos);
-            $keys=array_keys($tagpos);
-            for($i=0;$i<count($keys);$i++){
-                if($i>=count($keys)-1){
-                    break;
-                }
-                $k1=$keys[$i];
-                $k2=$keys[$i+1];
-                if($tagpos[$k1]==1 && $tagpos[$k2]==2){
-                    //echo $tagpos[$k1].":".$tagpos[$k2]."--------\r\n";
-                    //$tags[$tagpos[$k1]]=new TagInfo();
-                    $tag=["start"=>$k1,"end"=>$k2,"parent"=>null];
-                    $tags[$k1]=$tag;
-                    //$tags[$k1]=["x"=>$k1,"y"=>$k2];
-                    unset($tagpos[$k1]);
-                    unset($tagpos[$k2]);
-                    $i++;
-                }
+        //母板标签:<page:template file="" />;一个视图最多只存在一个母板
+        $pattern="/<page:template[^>]{1,}file[\s]*=[\s]*[\"|\']([^\s<>\"\']{1,})[\"|\'][^>]*>/i";
+        $matches=[];
+        if(preg_match($pattern,$view,$matches)>0){
+            $templateFile=$matches[1];
+            $templateFile=$relDir."/".$templateFile;
+            if(!file_exists($templateFile) || !is_file($templateFile)){
+                throw new \Exception("Template file '".$matches[1]."' does not exist");
             }
-            $_count=count($tagpos);
-        }
+            $template=file_get_contents($templateFile);
+            $template=StringUtil::removeUtf8Bom($template);
+            $view=$this->addTemplateToView($template,$view);
 
-        //搜索父标签
-        ksort($tags);
-        $tags=array_values($tags);
-        for($i=0;$i<count($tags);$i++){
-            $tag=$tags[$i];
-            for($j=count($tags)-1;$j>=0;$j--){
-                $_tag=$tags[$j];
-                if($_tag["start"] < $tag["start"] && $_tag["end"] > $tag["end"]){
-                    $tags[$i]["parent"]=$_tag;
-                    break;
+            //合并母板里的部件
+            $view=$this->loadParts($view, dirname($templateFile));
+        }
+        return $view;
+    }
+
+    /**
+     * 合并部件到视图模板
+     * @param string $view      视图内容
+     * @param string $relDir    视图所在目录
+     * @return mixed
+     */
+    protected function loadParts($view,$relDir)
+    {
+        //部件标签:<page:part file="" />
+        $pattern="/<page:part[^>]{1,}file[\s]*=[\s]*[\"|\']([^\s<>\"\']{1,})[\"|\'][^>]*>/i";
+        $matches=[];
+        if(preg_match_all($pattern,$view,$matches)>0){
+            $parts=$matches[0];
+            $tpls=$matches[1];
+            for($i=0;$i<count($parts);$i++){
+                $part=$parts[$i];
+                $tpl=$tpls[$i];
+                $tpl=$relDir."/".$tpl;
+
+                $tplHtml="";
+                if(file_exists($tpl) && is_file($tpl)){
+                    $tplHtml=file_get_contents($tpl);
                 }
+                $tplHtml=StringUtil::removeUtf8Bom($tplHtml);
+                //$tplHtml=$this->applyView($tplHtml);
+                $view=str_replace($part, $tplHtml, $view);
             }
         }
-        //         var_dump($tags);
-        //         exit;
-        return $tags;
+        return $view;
     }
 
     /**
@@ -596,7 +554,6 @@ class HtmlView extends View implements IOutput
         return $template;
     }
 
-
     /**
      * 搜索模板文件
      */
@@ -688,4 +645,74 @@ class HtmlView extends View implements IOutput
         return false;
     }
 
+    /**
+     * 搜索标签树
+     * @param string $template
+     */
+    private function loadTagTree($template)
+    {
+        $open="<".$this->m_tagPlaceHolder;
+        $close="</".$this->m_tagPlaceHolder.">";
+
+        //搜索标签起止位置
+        $tagpos=[];
+        $offset=strpos($template, $open);
+        while ($offset>0){
+            //echo $offset."----------------\r\n".substr($template, $offset)."\r\n";
+            $tagpos[$offset]=1;
+            $offset=strpos($template, $open,$offset+1);
+        }
+        $offset=strpos($template, $close);
+        while ($offset>0){
+            //echo $offset."----------------\r\n".substr($template, $offset)."\r\n";
+            $tagpos[$offset]=2;
+            $offset=strpos($template, $close,$offset+1);
+        }
+
+        //配对标签
+        ksort($tagpos);
+        $tags=[];
+        $count=0;
+        $_count=-1;
+        while ($count>$_count)
+        {
+            $count=count($tagpos);
+            $keys=array_keys($tagpos);
+            for($i=0;$i<count($keys);$i++){
+                if($i>=count($keys)-1){
+                    break;
+                }
+                $k1=$keys[$i];
+                $k2=$keys[$i+1];
+                if($tagpos[$k1]==1 && $tagpos[$k2]==2){
+                    //echo $tagpos[$k1].":".$tagpos[$k2]."--------\r\n";
+                    //$tags[$tagpos[$k1]]=new TagInfo();
+                    $tag=["start"=>$k1,"end"=>$k2,"parent"=>null];
+                    $tags[$k1]=$tag;
+                    //$tags[$k1]=["x"=>$k1,"y"=>$k2];
+                    unset($tagpos[$k1]);
+                    unset($tagpos[$k2]);
+                    $i++;
+                }
+            }
+            $_count=count($tagpos);
+        }
+
+        //搜索父标签
+        ksort($tags);
+        $tags=array_values($tags);
+        for($i=0;$i<count($tags);$i++){
+            $tag=$tags[$i];
+            for($j=count($tags)-1;$j>=0;$j--){
+                $_tag=$tags[$j];
+                if($_tag["start"] < $tag["start"] && $_tag["end"] > $tag["end"]){
+                    $tags[$i]["parent"]=$_tag;
+                    break;
+                }
+            }
+        }
+        //         var_dump($tags);
+        //         exit;
+        return $tags;
+    }
 }
