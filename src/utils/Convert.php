@@ -9,7 +9,20 @@ namespace swiftphp\core\utils;
 class Convert
 {
     /**
-     * 设置属性值
+     * 转换到对象属性值
+     * @param unknown $obj
+     * @param unknown $propertyName
+     * @param unknown $value
+     */
+    public static function toPropertyValue($obj,$propertyName,$value)
+    {
+        if(property_exists($obj, $propertyName)){
+            $obj->$propertyName=$value;
+        }
+    }
+
+    /**
+     * 使用setter设置属性值
      * @param object $object
      * @param string $propertyName
      * @param mixed $value
@@ -23,7 +36,7 @@ class Convert
     }
 
     /**
-     * 获取属性值
+     * 使用getter获取属性值
      * @param object $object
      * @param string $propertyName
      * @return mixed
@@ -37,7 +50,7 @@ class Convert
     }
 
     /**
-     * 设置属性值
+     * 使用setter设置属性值
      * @param object $object
      * @param array $keyValueArray
      */
@@ -212,7 +225,7 @@ class Convert
      * @param object $destObject	引用传递:目标对象
      * @return boolean
      */
-    public static function copyPropertyValues($srcObject,&$destObject,$fieldMap=[])
+    public static function copyPropertyValues($srcObject,$destObject,$fieldMap=[])
     {
         if(is_object($srcObject) && is_object($destObject)){
             foreach (get_object_vars($srcObject) as $prop=>$value){
@@ -229,8 +242,8 @@ class Convert
 
     /**
      * 复制数组
-     * @param unknown $srcArray
-     * @param unknown $destArray
+     * @param array $srcArray
+     * @param array $destArray
      * @param array $fieldMap
      * @return boolean
      */
@@ -240,23 +253,14 @@ class Convert
             $destArray=$srcArray;
             return true;
         }else{
+            $dim=count($fieldMap)==count($fieldMap,1);
             foreach ($fieldMap as $srcKey=>$destKey){
+                if($dim){
+                    $srcKey=$destKey;
+                }
                 $destArray[$destKey]=$srcArray[$srcKey];
             }
             return true;
-        }
-    }
-
-    /**
-     * 转换到对象属性值
-     * @param unknown $obj
-     * @param unknown $propertyName
-     * @param unknown $value
-     */
-    public static function toPropertyValue(&$obj,$propertyName,$value)
-    {
-        if(property_exists($obj, $propertyName)){
-            $obj->$propertyName=$value;
         }
     }
 }
