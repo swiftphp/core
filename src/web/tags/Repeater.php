@@ -93,6 +93,10 @@ class Repeater extends TagBase
 		}
 		$builder=$this->buildTemplate($data, $template);
 		$builder=$this->getIfTemplateContent($builder);
+
+		//清空多余的占位
+		$pattern="/#\{[\w\.]+\}/isU";
+		$builder=preg_replace($pattern, "", $builder);
 		return $builder;
 	}
 
