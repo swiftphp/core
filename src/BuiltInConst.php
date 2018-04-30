@@ -13,4 +13,5 @@ class BuiltInConst
      * @var string
      */
     public static $globalConfigSection="global";
+
 }
