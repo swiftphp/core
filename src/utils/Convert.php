@@ -47,6 +47,7 @@ class Convert
         if (method_exists($object, $getter)) {
             return $object->$getter();
         }
+        return null;
     }
 
     /**
