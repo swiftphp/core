@@ -620,7 +620,6 @@ class HtmlView extends View implements IOutput
         }else if(strpos($paramKey, ".")>0){
             $keys=explode(".", $paramKey);
             $value=$this->getUIParams($inputValues,$keys[0]);//根据第一段取得对象或数组值
-
             //key1.key2.key3...
             for($i=1;$i<count($keys);$i++){
                 $key=$keys[$i];
@@ -630,10 +629,8 @@ class HtmlView extends View implements IOutput
                     $val = Convert::getPropertyValue($value, $key);
 
                     //空值时,从属性取值
-                    if(is_null($val)){
-                        if(property_exists($value, $key)){
-                            $value=$value->$key;
-                        }
+                    if(is_null($val) && property_exists($value, $key)){
+                        $value=$value->$key;
                     }else{
                         $value=$val;
                     }
