@@ -171,5 +171,33 @@ class StringUtil
         }
         return $url;
     }
+
+    /**
+     * 是否以某字符串开始
+     * @param string $input
+     * @param string $substr
+     * @return boolean
+     */
+    public static function startWith($input,$substr)
+    {
+        if(strlen($substr)==0){
+            return false;
+        }
+        return strpos($input, $substr)===0;
+    }
+
+    /**
+     * 是否以某字符串结束
+     * @param string $input
+     * @param string $substr
+     * @return boolean
+     */
+    public static function endWith($input,$substr)
+    {
+        if(strlen($substr)==0){
+            return false;
+        }
+        return strrpos($input, $substr)===(strlen($input)-strlen($substr));
+    }
 }
 
