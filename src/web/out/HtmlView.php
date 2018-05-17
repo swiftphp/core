@@ -7,6 +7,7 @@ use swiftphp\core\utils\StringUtil;
 use swiftphp\core\web\HtmlHelper;
 use swiftphp\core\web\ITag;
 use swiftphp\core\utils\SecurityUtil;
+use swiftphp\core\utils\Convert;
 
 /**
  * 视图引擎输出
@@ -293,9 +294,18 @@ class HtmlView extends View implements IOutput
                     $key=$keys[$i];
                     if(!is_null($value)){
                         if(is_object($value)){
-                            $value=get_object_vars($value);
-                        }
-                        if(array_key_exists($key, $value)){
+                            //优先使用getter取值
+                            $val = Convert::getPropertyValue($value, $key);
+
+                            //空值时,从属性取值
+                            if(is_null($val)){
+                                if(property_exists($value, $key)){
+                                    $value=$value->$key;
+                                }
+                            }else{
+                                $value=$val;
+                            }
+                        }else if(is_array($value) && array_key_exists($key, $value)){
                             $value=$value[$key];
                         }
                     }
@@ -309,24 +319,6 @@ class HtmlView extends View implements IOutput
 
             }
         }
-
-        //         foreach($this->m_viewParams as $name=>$value){
-        //             //替換输出参数
-        //             if(!is_array($value) && !is_object($value)){
-        //                 //值类型
-        //                 $value=str_replace("$", "\\\$", $value);
-        //                 $view=preg_replace("/\\\${[\s]{0,}".$name."[\s]{0,}}/",$value,$view);
-        //             }else if(is_array($value)){
-        //                 //数组类型:${paramKey.$key}
-        //                 $view=$this->addArrayViewParams($view, $value,$name);
-        //             }else if(is_object($value)){
-        //                 //对象类型:${paramKey.$property}
-        //                 $value=get_object_vars($value);
-        //                 $view=$this->addArrayViewParams($view, $value,$name);
-        //             }else{
-        //                 //$view=preg_replace("/\\\\${[\s]{0,}".$name."[\s]{0,}\}/","%object%@".$name,$view);
-        //             }
-        //         }
         return $view;
     }
 
@@ -631,11 +623,21 @@ class HtmlView extends View implements IOutput
 
             //key1.key2.key3...
             for($i=1;$i<count($keys);$i++){
-                //对象转为数组
+                $key=$keys[$i];
+                //对象或数组
                 if(is_object($value)){
-                    $value=get_object_vars($value);
-                }
-                if(is_array($value)){
+                    //优先使用getter取值
+                    $val = Convert::getPropertyValue($value, $key);
+
+                    //空值时,从属性取值
+                    if(is_null($val)){
+                        if(property_exists($value, $key)){
+                            $value=$value->$key;
+                        }
+                    }else{
+                        $value=$val;
+                    }
+                }else if(is_array($value)){
                     $key=$keys[$i];
                     $value=$value[$key];
                 }
