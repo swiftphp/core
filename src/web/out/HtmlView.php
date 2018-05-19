@@ -415,10 +415,12 @@ class HtmlView extends View implements IOutput
             }
             $template=file_get_contents($templateFile);
             $template=StringUtil::removeUtf8Bom($template);
-            $view=$this->addTemplateToView($template,$view);
 
             //合并母板里的部件
-            $view=$this->loadParts($view, dirname($templateFile));
+            $template=$this->loadParts($template, dirname($templateFile));
+
+            //合并母板到视图
+            $view=$this->addTemplateToView($template,$view);
         }
         return $view;
     }
