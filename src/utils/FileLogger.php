@@ -57,6 +57,16 @@ class FileLogger implements ILogger,IConfigurable
     }
 
     /**
+     * 写入异常日志
+     * @param \Exception $ex
+     * @param string $prefix
+     */
+    public function logException(\Exception $ex,$prefix="ex")
+    {
+        $this->log($ex->getCode().":".$ex->getMessage(),"exception",$prefix);
+    }
+
+    /**
      * 缓存目录
      * @return string
      */
