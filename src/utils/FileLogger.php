@@ -63,7 +63,7 @@ class FileLogger implements ILogger,IConfigurable
      */
     public function logException(\Exception $ex,$prefix="ex")
     {
-        $this->log($ex->getCode().":".$ex->getMessage(),"exception",$prefix);
+        $this->log($ex->getCode().":".$ex->getMessage()+"\r\n"+$ex->getTraceAsString(),get_class($ex),$prefix);
     }
 
     /**
