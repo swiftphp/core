@@ -10,6 +10,7 @@ use swiftphp\core\web\IView;
 use swiftphp\core\http\IOutput;
 use swiftphp\core\web\out\Base;
 use swiftphp\core\config\ObjectFactory;
+use swiftphp\core\web\out\HtmlView;
 
 /**
  * MVC模型入口,Web过滤器
@@ -193,6 +194,11 @@ class WebFilter implements IFilter,IConfigurable
             //         echo "action:".$this->getRoute()->getActionName()."\r\n";
             //         echo "view:".$this->getRoute()->getViewFile()."\r\n";
             //         var_dump($this->getRoute()->getInitParams());
+
+            //视图引擎
+            if(empty($this->m_viewEngine)){
+                $this->m_viewEngine=new HtmlView();
+            }
 
             //控制器工厂
             $controllerFactory=$this->getControllerFactory();
