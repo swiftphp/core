@@ -198,6 +198,7 @@ class WebFilter implements IFilter,IConfigurable
             //视图引擎
             if(empty($this->m_viewEngine)){
                 $this->m_viewEngine=new HtmlView();
+                $this->m_viewEngine->setConfiguration($this->m_config);
             }
 
             //控制器工厂
