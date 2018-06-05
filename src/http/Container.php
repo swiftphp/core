@@ -149,7 +149,7 @@ class Container
                 //记录到日志
                 if(!empty($this->m_logger)){
                     try{
-                        $this->m_logger->log($msg,"exception","ec");
+                        $this->m_logger->log($msg,"exception","ex");
                     }catch (\Exception $e){}
                 }
 
