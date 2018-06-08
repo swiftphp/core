@@ -39,10 +39,11 @@ class ConfigurationFactory
      * 创建配置实例
      * @param string $configFile 入口配置文件名
      * @param string $baseDir    应用根目录
+     * @param string $userDir    用户根目录
      * @param array  $extConfigs 附加扩展的配置(section,name,value形式的数组)
      * @return IConfiguration
      */
-    public static function create($configFile,$baseDir="",$extConfigs=[])
+    public static function create($configFile,$baseDir="",$userDir="",$extConfigs=[])
     {
         //配置文件
         $pathInfo=pathinfo($configFile);
@@ -57,7 +58,7 @@ class ConfigurationFactory
         //如果缓存存在,则直接返回实例
         $configKey=$_configFile;
         if(array_key_exists($configKey, self::$m_configs)){
-            return self::returnConfig(self::$m_configs[$configKey],$baseDir,$extConfigs);
+            return self::returnConfig(self::$m_configs[$configKey],$baseDir,$userDir,$extConfigs);
         }
 
         //从php配置文件读取配置:如果php配置文件存在且修改时间大于所有的xml配置文件
@@ -68,7 +69,7 @@ class ConfigurationFactory
             //如果xml配置文件不存在,则直接从php配置直接返回
             if(!file_exists($xmlConfigFile)){
                 self::$m_configs[$configKey]=$config;
-                return self::returnConfig($config,$baseDir,$extConfigs);
+                return self::returnConfig($config,$baseDir,$userDir,$extConfigs);
             }
 
             //如果xml配置文件存在,则要检查文件最后修改时间
@@ -83,7 +84,7 @@ class ConfigurationFactory
             //php文件较新且非调试模式下
             if(!$overrided && !self::$m_debug){
                 self::$m_configs[$configKey]=$config;
-                return self::returnConfig($config,$baseDir,$extConfigs);
+                return self::returnConfig($config,$baseDir,$userDir,$extConfigs);
             }
         }
 
@@ -96,7 +97,7 @@ class ConfigurationFactory
 
         //返回实例
         if(array_key_exists($configKey, self::$m_configs)){
-            return self::returnConfig(self::$m_configs[$configKey],$baseDir,$extConfigs);
+            return self::returnConfig(self::$m_configs[$configKey],$baseDir,$userDir,$extConfigs);
         }
         return null;
     }
@@ -105,12 +106,14 @@ class ConfigurationFactory
      * 返回的配置实例
      * @param IConfiguration $config
      * @param string $baseDir
+     * @param string $userDir
      * @param array $extConfigs
-     * @return IConfiguration
+     * @return \swiftphp\core\config\IConfiguration
      */
-    private static function returnConfig(IConfiguration $config,$baseDir="",$extConfigs=[])
+    private static function returnConfig(IConfiguration $config,$baseDir="",$userDir="",$extConfigs=[])
     {
         $config->setBaseDir($baseDir);
+        $config->setUserDir($userDir);
         if(!empty($extConfigs)){
             foreach ($extConfigs as $ext){
                 $config->addConfigValue($ext["section"], $ext["name"], $ext["value"]);

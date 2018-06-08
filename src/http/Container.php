@@ -94,12 +94,13 @@ class Container
      * 容器构造
      * @param string $configFile    配置文件
      * @param string $baseDir       应用根目录(默认为配置入口文件所在目录)
+     * @param string $userDir       用户根目录(默认与应用根目录相同)
      * @param array $extConfigs     附加扩展的配置(section,name,value形式的数组,默认为空)
      * @param string $configSection 容器配置节点(默认为:container)
      */
-    public function __construct($configFile,$baseDir="",$extConfigs=[],$configSection="container")
+    public function __construct($configFile,$baseDir="",$userDir="",$extConfigs=[],$configSection="container")
     {
-        $this->m_config=ConfigurationFactory::create($configFile,$baseDir,$extConfigs);
+        $this->m_config=ConfigurationFactory::create($configFile,$baseDir,$userDir,$extConfigs);
         $this->m_configSection=$configSection;
     }
 

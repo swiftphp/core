@@ -42,7 +42,7 @@ interface IConfiguration
     function getConfigDir();
 
     /**
-     *获取当前应用根目录
+     *获取当前应用根目录(未设置时应该返回配置入口所在目录)
      */
     function getBaseDir();
 
@@ -51,6 +51,17 @@ interface IConfiguration
      * @param string $value
      */
     function setBaseDir($value);
+
+    /**
+     * 获取用户目录(未设置时应该返回应用根目录)
+     */
+    function getUserDir();
+
+    /**
+     * 设置用户目录
+     * @param string $value
+     */
+    function setUserDir($value);
 
     /**
      * 添加配置到当前实例

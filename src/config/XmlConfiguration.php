@@ -42,6 +42,12 @@ class XmlConfiguration implements IConfiguration
     private $m_baseDir="";
 
     /**
+     * 用户根目录
+     * @var string
+     */
+    private $m_userDir="";
+
+    /**
      * 构造函数,$configFile参数为配置xml文件名
      */
     public function __construct($configFile)
@@ -141,6 +147,27 @@ class XmlConfiguration implements IConfiguration
     public function setBaseDir($value)
     {
         $this->m_baseDir=$value;
+    }
+
+
+    /**
+     * 获取用户目录(未设置时应该返回应用根目录)
+     */
+    public function getUserDir()
+    {
+        if(!empty($this->m_userDir)){
+            return $this->m_userDir;
+        }
+        return $this->getBaseDir();
+    }
+
+    /**
+     * 设置用户目录
+     * @param string $value
+     */
+    public function setUserDir($value)
+    {
+        $this->m_userDir=$value;
     }
 
     /**
