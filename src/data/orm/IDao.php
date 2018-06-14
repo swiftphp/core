@@ -141,5 +141,16 @@ interface IDao
      * @param number $limit
      */
     function sqlQuery($sql,array $params=[],$offset=0,$limit=-1);
+
+    /**
+     /**
+     * 映射翻译过滤表达式(临时公开该方法,应用于特殊场景,不建议使用)
+     * @param object|string $modelClass 实体对象或类型名
+     * @param string $expression        表达式
+     * @param bool $autoAppendAlias     是否自动加上别名
+     * @return string
+     * @deprecated
+     */
+    function mapSqlExpression($modelClass,$expression,$autoAppendAlias=false);
 }
 

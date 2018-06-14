@@ -1087,6 +1087,8 @@ class Dao implements IDao, IConfigurable
             $sql .= " WHERE ".$filter;
         }
         $sql=$this->mapSqlExpression($modelClass,$sql,true);
+        echo $sql;
+        exit;
         return $this->getDatabase()->scalar($sql,$params);
     }
 
@@ -1185,6 +1187,75 @@ class Dao implements IDao, IConfigurable
     public function sqlQuery($sql,array $params=[],$offset=0,$limit=-1)
     {
         return $this->getDatabase()->query($sql,$params,$offset,$limit);
+    }
+
+    /**
+     /**
+     * 映射翻译过滤表达式
+     * @param object|string $modelClass 实体对象或类型名
+     * @param string $expression        表达式
+     * @param bool $autoAppendAlias     是否自动加上别名
+     * @return string
+     */
+    public function mapSqlExpression($model,$expression,$autoAppendAlias=false)
+    {
+        if(empty($expression)){
+            return $expression;
+        }
+        $table=$this->getOrmConfig()->getTable($model);
+        $tbl=$table->getName();
+        $alias=$table->getAlias();
+        $cols=$table->getColumnNames();
+
+        //保护参数占位符
+        $pattern="/:([\w]{1,})/";
+        $matches=[];
+        preg_match_all($pattern, $expression,$matches);
+        $paramMap=[];
+        foreach ($matches[1] as $paramName){
+            $key=SecurityUtil::newGuid();
+            $paramMap[$key]=$paramName;
+            $expression=str_replace(":".$paramName, ":".$key, $expression);
+        }
+
+        //替换有表前缀的表达式
+        $map=[];
+        foreach ($cols as $col){
+            $field=EntityUtil::mapModelField($model, $col);
+            if(!empty($field)){
+                $map[$col]=$field;
+                $replace=(empty($alias)?$tbl:$alias).".".$col;
+                $search=$alias.".".$field;
+                $expression=str_replace($search, $replace, $expression);
+            }
+        }
+
+        //替换没有前缀的表达式
+        $expression="--".$expression;
+        foreach ($map as $dbField=>$field){
+            $replace=$dbField;
+            if($autoAppendAlias){
+                $replace=(empty($alias)?$tbl:$alias).".".$dbField;
+            }
+            $pattern="/([^\w]{1,1})".$field."/";
+            $matches=[];
+            preg_match_all($pattern, $expression,$matches);
+            if(count($matches[0])>0){
+                for($i=0;$i<count($matches[0]);$i++){
+                    $search=$matches[0][$i];
+                    $_replace=$matches[1][$i].$replace;
+                    $expression=str_replace($search, $_replace, $expression);
+                }
+            }
+        }
+
+        //恢复输入参数占位符
+        foreach ($paramMap as $key=>$value){
+            $expression=str_replace(":".$key, ":".$value, $expression);
+        }
+
+        $expression=substr($expression, 2);
+        return $expression;
     }
 
     /**
@@ -1466,65 +1537,4 @@ class Dao implements IDao, IConfigurable
         }
         return $_exp;
     }
-
-    /**
-     /**
-     * 映射翻译过滤表达式
-     * @param Table $table
-     * @param string $filter
-     * @param bool $autoAppendAlias 是否自动加上别名
-     * @return string
-     */
-    private function mapSqlExpression($model,$expression,$autoAppendAlias=false)
-    {
-        if(empty($expression)){
-            return $expression;
-        }
-        $table=$this->getOrmConfig()->getTable($model);
-        $tbl=$table->getName();
-        $alias=$table->getAlias();
-        $cols=$table->getColumnNames();
-
-        //保护参数占位符
-        $pattern="/:([\w]{1,})/";
-        $matches=[];
-        preg_match_all($pattern, $expression,$matches);
-        $paramMap=[];
-        foreach ($matches[1] as $paramName){
-            $key=SecurityUtil::newGuid();
-            $paramMap[$key]=$paramName;
-            $expression=str_replace(":".$paramName, ":".$key, $expression);
-        }
-
-        //替换有表前缀的表达式
-        $map=[];
-        foreach ($cols as $col){
-            $field=EntityUtil::mapModelField($model, $col);
-            if(!empty($field)){
-                $map[$col]=$field;
-                $replace=(empty($alias)?$tbl:$alias).".".$col;
-                $search=$alias.".".$field;
-                $expression=str_replace($search, $replace, $expression);
-            }
-        }
-
-        //替换没有前缀的表达式
-        foreach ($map as $dbField=>$field){
-            $replace=$dbField;
-            if($autoAppendAlias){
-                $replace=(empty($alias)?$tbl:$alias).".".$dbField;
-            }
-            //$space=strpos($expression, $field)===0?"":" ";
-            $space="";
-            $expression=str_replace($space.$field, $space.$replace, $expression);
-        }
-
-        //恢复输入参数占位符
-        foreach ($paramMap as $key=>$value){
-            $expression=str_replace(":".$key, ":".$value, $expression);
-        }
-
-        return $expression;
-    }
-
 }
