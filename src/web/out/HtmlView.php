@@ -6,8 +6,8 @@ use swiftphp\core\web\View;
 use swiftphp\core\utils\StringUtil;
 use swiftphp\core\web\HtmlHelper;
 use swiftphp\core\web\ITag;
-use swiftphp\core\utils\SecurityUtil;
 use swiftphp\core\utils\Convert;
+use swiftphp\core\utils\ObjectUtil;
 
 /**
  * 视图引擎输出
@@ -53,14 +53,15 @@ class HtmlView extends View implements IOutput
      */
     public function output()
     {
-        if(empty($this->m_outputContent))
+        if(empty($this->m_outputContent)){
             $this->m_outputContent=$this->getContent();
-            $content=$this->m_outputContent;
-            $cacheFile=$this->getRuntimeDir()."/".md5($content);
-            if(!file_exists($cacheFile)){
-                file_put_contents($cacheFile, $content);
-            }
-            require_once $cacheFile;
+        }
+        $content=$this->m_outputContent;
+        $cacheFile=$this->getRuntimeDir()."/".md5($content);
+        if(!file_exists($cacheFile)){
+            file_put_contents($cacheFile, $content);
+        }
+        require_once $cacheFile;
     }
 
     /**
@@ -76,17 +77,13 @@ class HtmlView extends View implements IOutput
         $view=file_get_contents($viewFile);
         $view=StringUtil::removeUtf8Bom($view);
 
-        //标签树信息
-        $tagTree=[];
-
         //合并视图的模板与部件,预处理标签
         $viewCacheFile=$this->m_runtimeDir."/".md5($view);
-        $tagInfoCacheFile=$this->m_runtimeDir."/".md5(md5($view));
         $tagLibInfoCacheFile=$this->m_runtimeDir."/".md5(md5(md5($view)));
-        if(!$this->m_debug && file_exists($viewCacheFile) && file_exists($tagInfoCacheFile)){
+        $this->m_debug=false;
+        if(!$this->m_debug && file_exists($viewCacheFile)){
             //从缓存文件读取
             $view=file_get_contents($viewCacheFile);
-            $tagTree=unserialize(file_get_contents($tagInfoCacheFile));
 
             //taglibs
             if(file_exists($tagLibInfoCacheFile)){
@@ -95,20 +92,13 @@ class HtmlView extends View implements IOutput
 
         }else{
             //重新处理,并写到缓存文件
-            $view=$this->loadView($view,dirname($viewFile),$tagTree,$this->m_taglibs);
+            $view=$this->loadView($view,dirname($viewFile),$this->m_taglibs);
             file_put_contents($viewCacheFile, $view);
-            file_put_contents($tagInfoCacheFile, serialize($tagTree));
             file_put_contents($tagLibInfoCacheFile, serialize($this->m_taglibs));
         }
 
-        //预处理视图参数(抽取模板需要的参数),为后面替换参数的过程加速
-        $this->m_onlyViewParams = $this->preLoadViewParams($view);
-
         //替换参数与标签
-        $view=$this->applyView($view,$tagTree);
-
-        //清除空参数与标签
-        $view=preg_replace("/\\\${[^}]*}/","",$view);
+        $view=$this->applyView($view);
 
         //返回
         $this->m_outputContent=$view;
@@ -116,159 +106,127 @@ class HtmlView extends View implements IOutput
     }
 
     /**
-     * 预处理视图参数(把模板需要的参数另存到临时变量)
-     * @param string $view
-     */
-    protected function preLoadViewParams($view)
-    {
-        $pattern="/\\\${([^}]{1,})}/";
-        $matches=[];
-        preg_match_all($pattern, $view,$matches);
-        $params=[];
-        if(count($matches)>0){
-            foreach ($matches[1] as $param){
-                if(!in_array($param, $params)){
-                    $params[]=$param;
-                }
-            }
-        }
-        return $params;
-    }
-
-    /**
      * 替换变量,标签
      * @param string $view
      */
-    protected function applyView($view,$tagInfo=[])
+    protected function applyView($view)
     {
-        //替换标签(必须先处理标签,否则标签树的位置对应不上)
-        $view=$this->loadTags($view,$tagInfo);
+        //预处理视图参数(抽取模板需要的参数),为后面替换参数的过程加速
+        $this->m_onlyViewParams = $this->preLoadViewParams($view);
+
+        //替换标签
+        $view=$this->loadTags($view);
 
         //替换变量
         $view=$this->loadParams($view);
 
+        //清除空参数与标签
+        $view=preg_replace("/\\\${[^}]*}/","",$view);
+
         return $view;
     }
 
     /**
-     * 替换标签
+     * 替换标签内容
      * @param string $view
-     * @return string
      */
-    protected function loadTags($view,$tags=[])
+    protected function loadTags($view)
     {
-        //所有标签的信息
-        $tagObjs=[];
-        $tagPlaceHolderLen=strlen($this->m_tagPlaceHolder);
-        foreach ($tags as $tag){
-            $outerHtml=substr($view, $tag["start"],$tag["end"]-$tag["start"]+$tagPlaceHolderLen+3);
-            $pos=strpos($outerHtml, ">");
-            $innerHtml=substr($outerHtml, $pos+1,strrpos($outerHtml, "<")-$pos-1);
-            $attrs=HtmlHelper::getTagAttributes($outerHtml);
-            if(!array_key_exists("_tag", $attrs))
+        //$start="/<".$this->m_tagPlaceHolder." _tag=\"([a-zA-Z]{1,}[\w-]*):([a-zA-Z]{1,}[\w]*)\"/";
+        $start="<".$this->m_tagPlaceHolder." ";
+        $end="</".$this->m_tagPlaceHolder.">";
+
+        //不套嵌的标签起止位置
+        $startPos=strpos($view, $start);
+        $endPos=strpos($view, $end);
+        if(!$startPos || !$endPos || $endPos<=$startPos){
+            return $view;
+        }
+
+        //假设当前找到的结束标签为结束标签,那么要满足:
+        //1.下一个起始标签比当前结束位置更后,或者找不到下一个起始标签
+        //2,如果不满足,则继续向下找起始与结束标签
+        $nextStartPos=$startPos;
+        while(true){
+            $nextStartPos=strpos($view, $start,$nextStartPos+1);
+
+            //确认结束位置:下一个起始标签比当前结束位置更后,或者找不到下一个起始标签
+            if($nextStartPos>$endPos||$nextStartPos===false){
+                break;
+            }
+            $endPos=strpos($view, $end,$endPos+1);
+        }
+        $outerHtml=substr($view, $startPos,$endPos-$startPos+strlen($end));
+
+        //标签内容替换
+        $tagHtml=$this->getTagContent($outerHtml);
+        $view=str_replace($outerHtml, $tagHtml, $view);
+
+        //返回清除标签后的内容,递归处理子标签
+        return $this->loadTags($view);
+    }
+
+    /**
+     * 获取标签内容
+     * @param string $tagOuterHtml
+     * @throws \Exception
+     */
+    protected function getTagContent($tagOuterHtml)
+    {
+        $attributes=HtmlHelper::getTagAttributes($tagOuterHtml);
+        $innerHtml=HtmlHelper::getTagInnerHtml($tagOuterHtml, $this->m_tagPlaceHolder);
+
+        //创建标签对象
+        $types=explode(":",$attributes["_tag"]);
+        $class=$this->m_taglibs[$types[0]]."\\".ucfirst($types[1]);
+        if(!class_exists($class)){
+            throw new \Exception("Call to undefined tag '".$attributes["_tag"]."'");
+        }
+        $obj=new $class();
+        if(!($obj instanceof ITag)){
+            throw new \Exception("Tag '".$attributes["_tag"]."' not implements swiftphp\core\\web\\ITag");
+        }
+        $obj->setInnerHtml($innerHtml);
+
+        //注入标签属性
+        foreach ($attributes as $name=>$value){
+            //系统保留属性
+            if($name=="_tag" || $name=="_id"){
                 continue;
-                $types=explode(":",$attrs["_tag"]);
-                $class=$this->m_taglibs[$types[0]]."\\".ucfirst($types[1]);
-                if(!class_exists($class)){
-                    throw new \Exception("Call to undefined tag '".$attrs["_tag"]."'");
-                }
-                $obj=new $class();
-                if(!($obj instanceof ITag)){
-                    throw new \Exception("Tag '".$attrs["_tag"]."' not implements swiftphp\core\\web\\ITag");
-                }
-
-                //$obj->setInnerHtml($innerHtml);
-                foreach ($attrs as $name=>$value){
-                    if($name!="_tag" && $name!="_id"){
-                        //bool类型转换
-                        if(strtolower($value)=="true"){
-                            $value=1;
-                        }else if(strtolower($value)=="false"){
-                            $value=0;
-                        }
-
-                        //匹配动态参数
-//                         $matches=[];
-//                         if(preg_match("/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$value,$matches)>0){
-//                             $paramKey=$matches[1];
-//                             //$value=$this->getUIParams($this->m_tagParams,$paramKey);
-//                             $_value=$this->getUIParams($this->m_tagParams,$paramKey);
-//                             if(!is_array($_value) && !is_object($_value)){
-//                                 $value=str_replace($matches[0], $_value, $value);
-//                             }else{
-//                                 $value=$_value;
-//                             }
-//                         }
-
-                        //匹配动态参数(modified@2018-4-20,修改可以匹配多个参数)
-                        $matches=[];
-                        if(preg_match_all("/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$value,$matches)){
-                            $holders=$matches[0];
-                            $keys=$matches[1];
-                            for($i=0;$i<count($keys);$i++){
-                                $key=$keys[$i];
-                                $_value=$this->getUIParams($this->m_tagParams,$key);
-                                if(!is_array($_value) && !is_object($_value)){
-                                    $holder=$holders[$i];
-                                    $value=str_replace($holder, $_value, $value);
-                                }else{
-                                    //取出来的值为对象或数组,则忽略后面的参数
-                                    $value=$_value;
-                                    break;
-                                }
-                            }
-                        }
-
-                        //注入属性
-                        $setter="set".ucfirst($name);
-                        if(method_exists($obj, $setter)){
-                            $obj->$setter($value);
-                        }else{
-                            $obj->addAttribute($name, $value);
-                        }
+            }
+            //bool类型转换
+            if(strtolower($value)=="true"){
+                $value=1;
+            }else if(strtolower($value)=="false"){
+                $value=0;
+            }
+            //匹配动态参数(可以匹配多个参数)
+            $matches=[];
+            if(preg_match_all("/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$value,$matches)){
+                $holders=$matches[0];
+                $keys=$matches[1];
+                for($i=0;$i<count($keys);$i++){
+                    $key=$keys[$i];
+                    $_value=$this->getUIParams($this->m_tagParams,$key);
+                    if(!is_array($_value) && !is_object($_value)){
+                        $holder=$holders[$i];
+                        $value=str_replace($holder, $_value, $value);
+                    }else{
+                        //取出来的值为对象或数组,则忽略后面的参数
+                        $value=$_value;
+                        break;
                     }
                 }
+            }
 
-                //parent
-                $parentId="";
-                if(!empty($tag["parent"])){
-                    $ptag=$tag["parent"];
-                    $_outerHtml=substr($view, $ptag["start"],$ptag["end"]-$ptag["start"]+strlen($this->m_tagPlaceHolder)+3);
-                    $_attrs=HtmlHelper::getTagAttributes($_outerHtml);
-                    $parentId=$_attrs["_id"];
-                }
-
-                $tagObjs[$attrs["_id"]]=["tag"=>$obj,"innerHtml"=>$innerHtml,"outerHtml"=>$outerHtml,"parentId"=>$parentId];
-        }
-
-        //从后向前开始替换标签内容
-        $tagObjs=array_reverse($tagObjs);
-        foreach ($tagObjs as $tag){
-            $obj=$tag["tag"];
-            $innerHtml=$tag["innerHtml"];
-            $innerHtml=$this->loadParams($innerHtml);
-            $obj->setInnerHtml($innerHtml);
-            $html=$obj->getContent();
-            $outerHtml=$tag["outerHtml"];
-            $view=str_replace($outerHtml, $html, $view);
-
-            //replace all parents' html
-            $parentId=$tag["parentId"];
-            while (!empty($parentId)){
-                if(array_key_exists($parentId, $tagObjs)){
-                    $parent=$tagObjs[$parentId];
-                    $parent["innerHtml"]=str_replace($outerHtml, $html, $parent["innerHtml"]);
-                    $parent["outerHtml"]=str_replace($outerHtml, $html, $parent["outerHtml"]);
-                    $tagObjs[$parentId]=$parent;
-                    //                     var_dump($tagObjs);
-                    //                     exit;
-                    $parentId=$tagObjs[$parentId]["parentId"];
-                }else{
-                    $parentId="";
-                }
+            //注入属性
+            if(ObjectUtil::hasSetter($obj, $name)){
+                ObjectUtil::setPropertyValue($obj, $name, $value);
+            }else{
+                $obj->addAttribute($name, $value);
             }
         }
-        return $view;
+        return $obj->getContent();
     }
 
     /**
@@ -316,19 +274,38 @@ class HtmlView extends View implements IOutput
             if((!is_array($value) && !is_object($value))){
                 $value=str_replace("$", "\\\$", $value);
                 $view=preg_replace("/\\\${[\s]{0,}".$param."[\s]{0,}}/",$value,$view);
-
             }
         }
         return $view;
     }
 
     /**
-     * 预处理视图:混合视图的模板与部件,预处理标签信息
-     * @param string $view 预先读取的主模板内容
-     * @param string $relDir 模板所在目录(view所在目录)
-     * @return string
+     * 预处理视图参数(把模板需要的参数另存到临时变量,为后面的变量反向匹配做准备)
+     * @param string $view
      */
-    protected function loadView($view,$relDir,&$tagTree=[],&$taglibs=[])
+    protected function preLoadViewParams($view)
+    {
+        $pattern="/\\\${([^}]{1,})}/";
+        $matches=[];
+        preg_match_all($pattern, $view,$matches);
+        $params=[];
+        if(count($matches)>0){
+            foreach ($matches[1] as $param){
+                if(!in_array($param, $params)){
+                    $params[]=$param;
+                }
+            }
+        }
+        return $params;
+    }
+
+    /**
+     * 预处理视图:混合视图的模板与部件,预处理标签信息
+     * @param string $view           视图内容
+     * @param string $relDir         视图相对目录
+     * @param array  $taglibs        视图用到的标签解析库,键为前缀,值为命名空间
+     */
+    protected function loadView($view,$relDir,&$taglibs=[])
     {
         //标签库:<taglib prefix="php" namespace="swiftphp\core\web\tags" />
         //模板标签:<page:template file="" />
@@ -338,19 +315,7 @@ class HtmlView extends View implements IOutput
 
         //<taglib prefix="php" namespace="swiftphp\core\web\tags" />
         //读取标签库后,清空标签库标签
-        $pattern="/<taglib[^>]{1,}\/>/i";
-        $matches=[];
-        if(preg_match_all($pattern,$view,$matches,PREG_SET_ORDER)>0){
-            foreach($matches as $match){
-                $outHtml=$match[0];
-                $view=str_replace($outHtml, "", $view);
-                $attrs=HtmlHelper::getTagAttributes($match[0]);
-                $libPrifix=trim($attrs["prefix"]);
-                if(!array_key_exists($libPrifix, $taglibs)){
-                    $taglibs[$libPrifix]=trim($attrs["namespace"]);
-                }
-            }
-        }
+        $view=$this->loadTagLibs($view, $taglibs);
 
         //模板标签:<page:template file="" />;一个视图最多只存在一个模板
         $view=$this->loadTemplate($view, $relDir);
@@ -358,6 +323,20 @@ class HtmlView extends View implements IOutput
         //部件标签:<page:part file="" />
         $view=$this->loadParts($view, $relDir);
 
+        //标签预处理.单标签转为双标签;用占位符统一标记为通用的标签前缀
+        $view=$this->preloadTags($view, $taglibs);
+
+        return $view;
+    }
+
+    /**
+     * 标签预处理.单标签转为双标签;用占位符统一标记为通用的标签前缀
+     * @param string $view
+     * @param string $taglibs
+     * @return string
+     */
+    protected function preloadTags($view,$taglibs)
+    {
         //标签预处理
         foreach (array_keys($this->m_taglibs) as $prefix){
             //单标签转为双标签
@@ -381,7 +360,8 @@ class HtmlView extends View implements IOutput
                     $tag=$match[1];
 
                     $search="/<".$prefix.":".$tag."/";
-                    $replace="<".$this->m_tagPlaceHolder." _tag=\"".$prefix.":".$tag."\" _id=\"".SecurityUtil::newGuid()."\"";
+                    //$replace="<".$this->m_tagPlaceHolder." _tag=\"".$prefix.":".$tag."\" _id=\"".SecurityUtil::newGuid()."\"";
+                    $replace="<".$this->m_tagPlaceHolder." _tag=\"".$prefix.":".$tag."\"";
                     $view=preg_replace($search, $replace, $view,1);
 
                     $search="</".$prefix.":".$tag.">";
@@ -390,9 +370,32 @@ class HtmlView extends View implements IOutput
                 }
             }
         }
+        return $view;
+    }
 
-        $tagTree=$this->loadTagTree($view);
-
+    /**
+     * 读取视图用到的标签解析库,并清空标签库标签
+     * @param string $view           视图内容
+     * @param array  $taglibs        视图用到的标签解析库,键为前缀,值为命名空间
+     * @return mixed
+     */
+    protected function loadTagLibs($view,&$taglibs)
+    {
+        //<taglib prefix="php" namespace="swiftphp\core\web\tags" />
+        //读取标签库后,清空标签库标签
+        $pattern="/<taglib[^>]{1,}\/>/i";
+        $matches=[];
+        if(preg_match_all($pattern,$view,$matches,PREG_SET_ORDER)>0){
+            foreach($matches as $match){
+                $outHtml=$match[0];
+                $view=str_replace($outHtml, "", $view);
+                $attrs=HtmlHelper::getTagAttributes($match[0]);
+                $libPrifix=trim($attrs["prefix"]);
+                if(!array_key_exists($libPrifix, $taglibs)){
+                    $taglibs[$libPrifix]=trim($attrs["namespace"]);
+                }
+            }
+        }
         return $view;
     }
 
@@ -522,31 +525,6 @@ class HtmlView extends View implements IOutput
         return $contents;
     }
 
-    /**
-     * 替换数组变量
-     * @param unknown $template
-     * @param unknown $array
-     * @param string $prefix
-     * @return mixed
-     */
-    protected function addArrayViewParams($template,$array,$prefix="")
-    {
-        if(is_array($array)){
-            foreach ($array as $key=>$value){
-                $_prefix=$prefix.".".$key;
-                if(is_array($value)){
-                    $template=$this->addArrayViewParams($template, $value,$_prefix);
-                }else if(is_object($value)){
-                    $_value=get_object_vars($value);
-                    $template=$this->addArrayViewParams($template, $_value,$_prefix);
-                }else{
-                    $value=str_replace("$", "\\\$", $value);
-                    $template=preg_replace("/\\\${[\s]{0,}".$prefix.".".(string)$key."[\s]{0,}}/",$value,$template);
-                }
-            }
-        }
-        return $template;
-    }
 
     /**
      * 搜索模板文件
@@ -644,76 +622,5 @@ class HtmlView extends View implements IOutput
             return $value;
         }
         return false;
-    }
-
-    /**
-     * 搜索标签树
-     * @param string $template
-     */
-    private function loadTagTree($template)
-    {
-        $open="<".$this->m_tagPlaceHolder;
-        $close="</".$this->m_tagPlaceHolder.">";
-
-        //搜索标签起止位置
-        $tagpos=[];
-        $offset=strpos($template, $open);
-        while ($offset>0){
-            //echo $offset."----------------\r\n".substr($template, $offset)."\r\n";
-            $tagpos[$offset]=1;
-            $offset=strpos($template, $open,$offset+1);
-        }
-        $offset=strpos($template, $close);
-        while ($offset>0){
-            //echo $offset."----------------\r\n".substr($template, $offset)."\r\n";
-            $tagpos[$offset]=2;
-            $offset=strpos($template, $close,$offset+1);
-        }
-
-        //配对标签
-        ksort($tagpos);
-        $tags=[];
-        $count=0;
-        $_count=-1;
-        while ($count>$_count)
-        {
-            $count=count($tagpos);
-            $keys=array_keys($tagpos);
-            for($i=0;$i<count($keys);$i++){
-                if($i>=count($keys)-1){
-                    break;
-                }
-                $k1=$keys[$i];
-                $k2=$keys[$i+1];
-                if($tagpos[$k1]==1 && $tagpos[$k2]==2){
-                    //echo $tagpos[$k1].":".$tagpos[$k2]."--------\r\n";
-                    //$tags[$tagpos[$k1]]=new TagInfo();
-                    $tag=["start"=>$k1,"end"=>$k2,"parent"=>null];
-                    $tags[$k1]=$tag;
-                    //$tags[$k1]=["x"=>$k1,"y"=>$k2];
-                    unset($tagpos[$k1]);
-                    unset($tagpos[$k2]);
-                    $i++;
-                }
-            }
-            $_count=count($tagpos);
-        }
-
-        //搜索父标签
-        ksort($tags);
-        $tags=array_values($tags);
-        for($i=0;$i<count($tags);$i++){
-            $tag=$tags[$i];
-            for($j=count($tags)-1;$j>=0;$j--){
-                $_tag=$tags[$j];
-                if($_tag["start"] < $tag["start"] && $_tag["end"] > $tag["end"]){
-                    $tags[$i]["parent"]=$_tag;
-                    break;
-                }
-            }
-        }
-        //         var_dump($tags);
-        //         exit;
-        return $tags;
     }
 }

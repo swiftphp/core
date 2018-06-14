@@ -2,6 +2,7 @@
 namespace swiftphp\core\data\db;
 
 use swiftphp\core\system\ILogger;
+use swiftphp\core\system\Console;
 
 /**
  * 数据访问PDO实现
@@ -48,6 +49,12 @@ class MysqlPDO implements IDatabase
     private $m_logger=null;
 
     /**
+     * 是否调试状态
+     * @var bool
+     */
+    private $m_debug=false;
+
+    /**
      * 设置DSN
      * @param string $value
      */
@@ -81,6 +88,15 @@ class MysqlPDO implements IDatabase
     public function setLogger(ILogger $value)
     {
         $this->m_logger=$value;
+    }
+
+    /**
+     * 是否调试状态
+     * @param bool $value
+     */
+    public function setDebug($value)
+    {
+        $this->m_debug=$value;
     }
 
     /**
@@ -124,77 +140,90 @@ class MysqlPDO implements IDatabase
 
     /**
      * 返回第一行第一列数据
-     *
-     * @param string $sql
-     * @return array
+     * @param string $sql SQL语句
+     * @param array $params 输入参数
      */
-    public function scalar($sql)
+    public function scalar($sql,array $params=[])
     {
         try{
-            $query=$this->pdoExecute($sql);
-            $rs=$query->fetch();
-            return $rs[0];
+            $query=$this->pdoExecute($sql,$params);
+            if($query){
+                $rs=$query->fetch();
+                if($rs && count($rs)>0){
+                    return $rs[0];
+                }
+            }
         }catch (\Exception $ex){
             $this->fatchException($ex);
             throw $ex;
         }
+        return null;
     }
 
     /**
      * 返回一行数据集
-     *
-     * @param string $sql
+     * @param string $sql SQL语句
+     * @param array $params 输入参数
      */
-    public function reader($sql)
+    public function reader($sql,array $params=[])
     {
         try{
-            $query=$this->pdoExecute($sql);
-            $query->setFetchMode(\PDO::FETCH_ASSOC);
-            $rs=$query->fetch();
-            return $rs;
+            $query=$this->pdoExecute($sql,$params);
+            if($query){
+                $query->setFetchMode(\PDO::FETCH_ASSOC);
+                $rs=$query->fetch();
+                if($rs){
+                    return $rs;
+                }
+            }
         }catch (\Exception $ex){
             $this->fatchException($ex);
             throw $ex;
         }
+        return null;
     }
 
     /**
      * 执行非查询
-     *
-     * @param string $sql
+     * @param string $sql SQL语句
+     * @param array $params 输入参数
+     * @return int 映射记录数,-1表示执行失败
      */
-    public function execute($sql)
+    public function execute($sql,array $params=[])
     {
-        if(!$this->ping()){
-            $this->connect();
-        }
+        $this->autoConnect();
         try{
-            $rows=$this->m_pdo->exec($sql);
-            return $rows;
+            $query=$this->pdoExecute($sql,$params);
+            if($query){
+                return $query->rowCount();
+            }
         }catch (\Exception $ex){
             $this->fatchException($ex);
             throw $ex;
         }
+        return -1;
     }
 
     /**
      * 执行返回记录集
-     *
-     * @param string $sql
+     * @param string $sql SQL语句(不包含分页表达式)
+     * @param array $params 输入参数
      * @param int $start
      * @param int $length
      * @return array
      */
-    public function query($sql, $offset = 0, $limit = -1)
+    public function query($sql,array $params=[], $offset = 0, $limit = -1)
     {
         if($offset>= 0 && $limit>= 0){
             $sql .= " LIMIT ".$offset.",".$limit;
         }
         try{
-            $query=$this->pdoExecute($sql);
-            $query->setFetchMode(\PDO::FETCH_ASSOC);
-            $rs=$query->fetchAll();
-            return $rs;
+            $query=$this->pdoExecute($sql,$params);
+            if($query){
+                $query->setFetchMode(\PDO::FETCH_ASSOC);
+                $rs=$query->fetchAll();
+                return $rs;
+            }
         }catch (\Exception $ex){
             $this->fatchException($ex);
             throw $ex;
@@ -206,6 +235,7 @@ class MysqlPDO implements IDatabase
      */
     public function getInsertId()
     {
+        $this->autoConnect();
         try{
             return $this->m_pdo->lastInsertId();
         }catch (\Exception $ex){
@@ -219,6 +249,7 @@ class MysqlPDO implements IDatabase
      */
     public function begin()
     {
+        $this->autoConnect();
         $this->m_pdo->setAttribute(\PDO::ATTR_AUTOCOMMIT, 0);
         $this->m_pdo->beginTransaction();
     }
@@ -245,17 +276,30 @@ class MysqlPDO implements IDatabase
      * PDO执行
      * @return \PDOStatement
      */
-    public function pdoExecute($sql)
+    private function pdoExecute($sql,array $params=[])
     {
-        if(!$this->ping()){
-            $this->connect();
+        if($this->m_debug){
+            Console::printLine($sql);
         }
+        $this->autoConnect();
         try{
-            $query = $this->m_pdo->query($sql);
-            return $query;
+            $statement = $this->m_pdo->prepare($sql);
+            if($statement->execute($params)){
+                return $statement;
+            }
         }catch (\Exception $ex){
             $this->fatchException($ex);
             throw $ex;
+        }
+    }
+
+    /**
+     * 自动连接数据库
+     */
+    private function autoConnect()
+    {
+        if(!$this->ping()){
+            $this->connect();
         }
     }
 
@@ -267,7 +311,8 @@ class MysqlPDO implements IDatabase
     {
         $this->m_exception=$ex;
         if(!is_null($this->m_logger)){
-            $this->m_logger->log($ex->getCode().":".$ex->getMessage()."\r\n".$ex->getTraceAsString(),"pdo ex","err");
+            $this->m_logger->logException($ex,"pdo ex");
+            //$this->m_logger->log($ex->getCode().":".$ex->getMessage()."\r\n".$ex->getTraceAsString(),"pdo ex","err");
         }
     }
 }

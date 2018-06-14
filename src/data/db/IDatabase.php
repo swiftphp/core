@@ -31,23 +31,23 @@ interface IDatabase
 
     /**
      * 返回第一行第一列数据
-     * @param string $sql
-     * @return array
+     * @param unknown $sql
+     * @param array $params
      */
-    function scalar($sql);
+    function scalar($sql,array $params=[]);
 
     /**
      * 返回一行数据集
      * @param string $sql
      */
-    function reader($sql);
+    function reader($sql,array $params=[]);
 
     /**
      * 执行非查询
      * @param string $sql
      * @return void
      */
-    function execute($sql);
+    function execute($sql,array $params=[]);
 
     /**
      * 执行返回记录集
@@ -56,7 +56,7 @@ interface IDatabase
      * @param int  $limit
      * @return array
      */
-    function query($sql,$offset=0,$limit=-1);
+    function query($sql,array $params=[],$offset=0,$limit=-1);
 
     /**
      * 获取最后插入记录的ID

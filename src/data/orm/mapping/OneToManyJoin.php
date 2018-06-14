@@ -9,6 +9,12 @@ namespace swiftphp\core\data\orm\mapping;
 class OneToManyJoin extends QueryJoinCollection
 {
     /**
+     * 关联字段的类型名(需要同步load时必须)
+     * @var string
+     */
+    protected $class;
+
+    /**
      * 是否级联操作
      * @var string
      */
@@ -19,6 +25,24 @@ class OneToManyJoin extends QueryJoinCollection
      * @var string
      */
     protected $order;
+
+    /**
+     * 获取关联字段的类型名
+     * @return string
+     */
+    public function getClass()
+    {
+        return $this->class;
+    }
+
+    /**
+     * 设置关联字段的类型名
+     * @param unknown $value
+     */
+    public function setClass($value)
+    {
+        $this->class=$value;
+    }
 
     /**
      * 是否级联操作

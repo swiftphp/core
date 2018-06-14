@@ -2,30 +2,23 @@
 namespace swiftphp\core\data\orm;
 
 use swiftphp\core\config\IConfigurable;
-use swiftphp\core\data\orm\mapping\Config;
 use swiftphp\core\data\db\IDatabase;
 use swiftphp\core\system\ILogger;
 use swiftphp\core\config\IConfiguration;
 use swiftphp\core\utils\StringUtil;
-use swiftphp\core\utils\Convert;
-use swiftphp\core\data\types\Type;
 use swiftphp\core\data\orm\mapping\Table;
-use swiftphp\core\data\orm\mapping\Column;
 use swiftphp\core\data\orm\mapping\Join;
+use swiftphp\core\data\orm\mapping\IConfig;
+use swiftphp\core\utils\SecurityUtil;
+use swiftphp\core\data\orm\mapping\ManyToOneJoin;
 
 /**
  * 数据DAO
  * @author Tomix
  *
  */
-class Dao implements IConfigurable
+class Dao implements IDao, IConfigurable
 {
-    /**
-     * 是否调试状态
-     * @var bool
-     */
-    private $m_debug=false;
-
     /**
      * 数据源
      * @var IDatabase
@@ -33,14 +26,8 @@ class Dao implements IConfigurable
     private $m_database;
 
     /**
-     * 日志
-     * @var ILogger
-     */
-    private $m_logger=null;
-
-    /**
      * 当前ORM配置
-     * @var Config
+     * @var IConfig
      */
     private $m_ormConfig=null;
 
@@ -51,25 +38,34 @@ class Dao implements IConfigurable
     private $m_config=null;
 
     /**
+     * 是否调试状态
+     * @var bool
+     */
+    private $m_debug=false;
+
+    /**
+     * 日志
+     * @var ILogger
+     */
+    private $m_logger=null;
+
+    /**
+     * 打印SQL语句
+     * @var string
+     */
+    private $m_showSql=false;
+
+    /**
      * 事务状态：true表示状态已挂起
      * @var bool
      */
     private $m_transactionStatus=false;
 
     /**
-     * 是否调试状态
-     * @param bool $value
-     */
-    public function setDebug($value)
-    {
-        $this->m_debug=$value;
-    }
-
-    /**
      * 注入数据源描述
      * @param IDatabase $value
      */
-    public function setDatabase($value)
+    public function setDatabase(IDatabase $value)
     {
         $this->m_database=$value;
     }
@@ -84,21 +80,21 @@ class Dao implements IConfigurable
     }
 
     /**
-     * 注入日志记录器
-     * @param ILogger $value
+     * ORM配置
+     * @param IConfig $value
      */
-    public function setLogger(ILogger $value)
+    public function setOrmConfig(IConfig $value)
     {
-        $this->m_logger=$value;
+        $this->m_ormConfig=$value;
     }
 
     /**
-     * ORM配置
-     * @param Config $value
+     * 获取当前ORMs配置
+     * @return IConfig
      */
-    public function setOrmConfig(Config $value)
+    public function getOrmConfig()
     {
-        $this->m_ormConfig=$value;
+        return $this->m_ormConfig;
     }
 
     /**
@@ -108,6 +104,42 @@ class Dao implements IConfigurable
     public function setConfiguration(IConfiguration $value)
     {
         $this->m_config=$value;
+    }
+
+    /**
+     * 是否调试状态
+     * @param bool $value
+     */
+    public function setDebug($value)
+    {
+        $this->m_debug=$value;
+    }
+
+    /**
+     * 注入日志记录器
+     * @param ILogger $value
+     */
+    public function setLogger(ILogger $value)
+    {
+        $this->m_logger=$value;
+    }
+
+    /**
+     * 是否打印SQL语句
+     * @return bool
+     */
+    public function getShowSql()
+    {
+        return $this->m_showSql;
+    }
+
+    /**
+     * 是否打印SQL语句
+     * @param bool $value
+     */
+    public function setShowSql($value)
+    {
+        $this->m_showSql = $value;
     }
 
     /**
@@ -126,28 +158,6 @@ class Dao implements IConfigurable
     public function getTransactionStatus()
     {
         return $this->m_transactionStatus;
-    }
-
-    /**
-     * 获取当前ORMs配置
-     * @return Config
-     */
-    public function getOrmConfig()
-    {
-        return $this->m_ormConfig;
-    }
-
-    /**
-     * 加载ORM配置
-     */
-    public function config()
-    {
-        //连接数据源
-        $this->m_database->connect();
-
-        //加载ORM配置
-        $this->m_ormConfig->setDatabase($this->m_database);
-        $this->m_ormConfig->load();
     }
 
     /**
@@ -183,11 +193,11 @@ class Dao implements IConfigurable
      */
     public function loadDefaultValue($model)
     {
-        $cols = $this->getOrmConfig()->getTable($model)->getColumns();
+        $cols=$this->getOrmConfig()->getTable($model)->getColumns();
         foreach ($cols as $name => $col) {
-            $field=$this->mapModelField($model, $name);
+            $field=EntityUtil::mapModelField($model, $name);
             if (!empty($field)) {
-                $model->$field= $col->getDefault();
+                EntityUtil::setFieldValue($model, $field, $col->getDefault());
             }
         }
     }
@@ -196,11 +206,11 @@ class Dao implements IConfigurable
      * 加载数据
      * @param object $model 实体对象
      * @param string|array $fields 查询字段,用实体属性名表示,留空表示按主键主段查询
-     * @param string $sync
+     * @param bool $sync
      * @throws \Exception
      * @return boolean
      */
-    public function load($model, $fields = null, $sync = true)
+    public function load($model, $fields = null, $sync = true,$aliasOneToManyToEntity=false)
     {
         //表模型
         $tableObj = $this->getOrmConfig()->getTable($model);
@@ -215,10 +225,11 @@ class Dao implements IConfigurable
 
         //拼接过滤表达式
         $filter = "";
+        $params=[];
         if (is_array($fields) && count($fields) > 0) {
             //按指定字段查询
             foreach ($fields as $field) {
-                if(!property_exists($model,$field)){
+                if(!EntityUtil::fieldExists($model,$field)){
                     throw new \Exception("实体'" . get_class($model) . "'不存在属性'" . $field. "'");
                 }
                 $dbField=$field;
@@ -231,30 +242,33 @@ class Dao implements IConfigurable
                 if ($filter != ""){
                     $filter .= " AND ";
                 }
-                $filter .= $dbField. "='" . $model->$field . "'";
+                $filter .= $dbField. "=:".$dbField;
+                $params[$dbField]=EntityUtil::getFieldValue($model, $field);
             }
         } else {
             //按主键查询
             foreach ($primaryKeys as $keyField) {
-                $field=$this->mapModelField($model, $keyField);
+                $field=EntityUtil::mapModelField($model, $keyField);
                 if(empty($field)){
                     throw new \Exception("实体'".get_class($model)."'不存在主键标识'".$keyField."'");
                 }
                 if ($filter != ""){
                     $filter .= " AND ";
                 }
-                $filter .= $keyField . "='" . $model->$field. "'";
+                $filter .= $keyField . "=:" . $keyField;
+                $params[$keyField]=EntityUtil::getFieldValue($model, $field);
             }
         }
         $sql = "SELECT * FROM " . $table . "";
         $sql .= " WHERE " . $filter;
 
-        $reader=$this->getDatabase()->reader($sql);
+        $reader=$this->getDatabase()->reader($sql,$params);
         if ($reader && is_null($this->getDatabase()->getException())) {
             foreach ($reader as $fieldName=> $value) {
-                $field=$this->mapModelField($model, $fieldName);
+                $field=EntityUtil::mapModelField($model, $fieldName);
+                $field=EntityUtil::mapModelField($model, $fieldName);
                 if(!empty($field)){
-                    $model->$field= $value;
+                    EntityUtil::setFieldValue($model, $field, $value);
                 }
             }
         } else {
@@ -263,11 +277,11 @@ class Dao implements IConfigurable
 
         //加载集合属性(关联表)与多对一属性,映射到二维数组,键为字段名或映射驼峰命名字段名
         if ($sync) {
-            //加载一对多
-            $this->loadOneToManyJoins($model, $tableObj);
             //加载多对一
             $this->loadManyToOneJoins($model, $tableObj);
 
+            //加载一对多
+            $this->loadOneToManyJoins($model, $tableObj,$aliasOneToManyToEntity);
         }
         if (is_null($this->getException())) {
             return true;
@@ -277,6 +291,7 @@ class Dao implements IConfigurable
     }
 
     /**
+     * (已测试)
      * 插入一条记录,成功则返回记录ID,失败返回false
      * @param Object $model
      * @param bool $sync
@@ -299,25 +314,22 @@ class Dao implements IConfigurable
         // 插入主记录
         $fields = "";
         $values = "";
+        $params=[];
         foreach ($columns as $columnName) {
-            $fieldName=$this->mapModelField($model, $columnName);
+            $fieldName=EntityUtil::mapModelField($model, $columnName);
             if (! in_array($columnName, $incrementKeys) && !empty($fieldName)) {
-                $column = $tableObj->getColumn($columnName);
                 if ($fields != ""){
                     $fields .= ",";
                 }
                 $fields .= $columnName;
-
-                // 字段值
-                $fieldValue = $model->$fieldName;
                 if ($values != ""){
                     $values .= ",";
                 }
-                if ($fieldValue === null || ($fieldValue === "" && $column->getType() != Type::STRING)) {
-                    $values .= "NULL";
-                } else {
-                    $values .= "'" . Convert::toDbString($fieldValue) . "'";
-                }
+                $values .= ":".$columnName;
+
+                // 字段值
+                $fieldValue = EntityUtil::getFieldValue($model, $fieldName);
+                $params[$columnName]=$fieldValue;
             }
         }
         $sql = "INSERT INTO " . $table . " ({0}) VALUES ({1})";
@@ -325,21 +337,21 @@ class Dao implements IConfigurable
         $sql = str_replace("{1}", $values, $sql);
 
         //执行操作
-        $this->getDatabase()->execute($sql);
+        $this->getDatabase()->execute($sql,$params);
         $insertId = $this->getDatabase()->getInsertId();
 
-        //提取插入ID重新赋值到模型属性
+        //提取插入ID重新赋值到模型属性(非自动递增的ID不需要处理)
         if (! empty($insertId)) {
             foreach ($primaryKeys as $pKey) {
-                $propName=$this->mapModelField($model, $pKey);
+                $propName=EntityUtil::mapModelField($model, $pKey);
                 if (in_array($pKey, $incrementKeys) && !empty($propName)) {
-                    $model->$propName= $insertId;
+                    EntityUtil::setFieldValue($model, $propName, $insertId);
                     break;
                 }
             }
         }
 
-        //插入关联数据
+        //插入关联一对多数据
         if ($sync) {
             foreach ($sets as $name => $set) {
                 if ($set->getSync()) {
@@ -378,22 +390,36 @@ class Dao implements IConfigurable
                     if($_key == null || $_fkey == null){
                         continue;
                     }
-                    $keyField=$this->mapModelField($model, $_key);//映射到实体属性字段
+                    $keyField=EntityUtil::mapModelField($model, $_key);//映射到实体属性字段
                     if(empty($keyField)){
                         continue;
                     }
                     // foreach rows
-                    foreach ($model->$name as $row) {
+                    $many=EntityUtil::getFieldValue($model, $name);
+                    if(empty($many)||!is_array($many)){
+                        continue;
+                    }
+                    foreach ($many as $row) {
                         $fields = "";
                         $values = "";
+                        $params=[];
                         foreach ($_tableObj->getColumns() as $col) {
                             $dbField = $col->getName();//表字段名
-                            $field=$this->mapArrayKey($row, $dbField);//数组键
+                            $field="";
+                            if(is_object($row)){
+                                $field=EntityUtil::mapModelField($row, $dbField);//属性名
+                            }else if(is_array($row)){
+                                $field=EntityUtil::mapArrayKey($row, $dbField);//数组键
+                            }
                             $value = null;
                             if ($dbField== $_fkey) {
-                                $value = $model->$keyField;
+                                $value = EntityUtil::getFieldValue($model, $keyField);
                             } elseif (!empty($field)) {
-                                $value = $row[$field];
+                                if(is_object($row)){
+                                    $value=EntityUtil::getFieldValue($row, $field);
+                                }else if(is_array($row)){
+                                    $value = $row[$field];
+                                }
                             }
 
                             //拼装SQL
@@ -409,21 +435,16 @@ class Dao implements IConfigurable
                                 if ($values != ""){
                                     $values .= ",";
                                 }
-                                if ($value=== null || ($value=== "" && $col->getType() != Type::STRING)) {
-                                    $values .= "NULL";
-                                } else if($col->getType()==Type::INTEGER || $col->getType()==Type::DOUBLE){
-                                    $values .= $value;
-                                }else {
-                                    $values .= "'" . Convert::toDbString($value) . "'";
-                                }
+                                $values.=":".$dbField;
+                                $params[$dbField]=$value;
                             }
                         }
                         $sql = "INSERT INTO " . $_table . " ({0}) VALUES ({1})";
                         $sql = str_replace("{0}", $fields, $sql);
                         $sql = str_replace("{1}", $values, $sql);
-                        $this->getDatabase()->execute($sql);
+                        $this->getDatabase()->execute($sql,$params);
 //                         echo $sql."\r\n";
-//                         $this->getDatabase()->rollbackTransaction();
+//                         $this->getDatabase()->rollback();
 //                         exit;
                     }
                 }
@@ -444,8 +465,7 @@ class Dao implements IConfigurable
     }
 
     /**
-     * 更新一条记录,返回bool类型
-     *
+     * 更新一条记录(未完成)
      * @param object $model 数据实体
      * @param string $sync  是否同步到关联表
      * @param bool $humpFieldFirst 更新关联表时，是否以驼峰命名的字段优先取值.
@@ -470,8 +490,15 @@ class Dao implements IConfigurable
         // 更新主表
         $filter = "";
         $update = "";
+        $params=[];
+        $keyParams=[];
+        $versionField=$tableObj->getVersion();//乐观锁版本控制字段
         foreach ($properties as $fieldName) {
-            $field=$this->mapModelField($model, $fieldName);
+            if($fieldName==$versionField){
+                //排除版本控制字段
+                continue;
+            }
+            $field=EntityUtil::mapModelField($model, $fieldName);
             if(empty($field)){
                 if(in_array($fieldName, $primaryKeys)){
                     throw new \Exception("实体'".get_class($model)."'不包含主键字段.".$fieldName."'");
@@ -479,48 +506,50 @@ class Dao implements IConfigurable
                     continue;
                 }
             }
-            $column = $tableObj->getColumn($fieldName);
             if (in_array($fieldName, $primaryKeys)) {
                 // 主键字段
                 if ($filter != ""){
                     $filter .= " AND ";
                 }
-                $filter .= $alias . "." . $fieldName . "='" . Convert::toDbString($model->$field). "'";
+                $filter .= $alias . "." . $fieldName . "=:" . $fieldName;
+                $keyValue=EntityUtil::getFieldValue($model, $field);
+                $params[$fieldName]=$keyValue;
+                $keyParams[$fieldName]=$keyValue;
             } elseif (! in_array($fieldName, $incrementKeys)) {
                 // 非主键字段
                 if ($update != ""){
                     $update .= ",";
                 }
+                $update .= $alias . "." . $fieldName . "=:".$fieldName;
 
                 // 字段值
-                $fieldValue = $model->$field;
-                if ($fieldValue === null || ($fieldValue === "" && $column->getType() != Type::STRING)) {
-                    $update .= $alias . "." . $fieldName . "=NULL";
-                } else {
-                    $update .= $alias . "." . $fieldName . "='" . Convert::toDbString($fieldValue) . "'";
-                }
+                $fieldValue=EntityUtil::getFieldValue($model, $field);
+                $params[$fieldName]=$fieldValue;
             }
         }
         $sql = "UPDATE " . $table . " " . $alias . " SET {0} WHERE {1}";
 
-        //添加版本控制实现乐观锁
-        $versionFilter=$filter;
-        $versionField=$tableObj->getVersion();
-        $modelVerField=$this->mapModelField($model, $versionField);
+        //版本控制实现乐观锁
+        $_filter=$filter;//添加了版本控制的过滤
+        $modelVerField=EntityUtil::mapModelField($model, $versionField);
         if(!empty($forVersion) && !empty($versionField) && !empty($modelVerField)){
-            $versionFilter.=" AND (".$versionField."='".$model->$modelVerField."' OR ".$versionField." IS NULL)";
+            if ($_filter != ""){
+                $_filter .= " AND ";
+            }
+            //$filter .= $alias . "." . $fieldName . "=:" . $fieldName;
+            $_filter .= "(".$alias.".".$versionField."=:".$versionField." OR ".$alias.".".$versionField." IS NULL)";
+            $params[$versionField]=EntityUtil::getFieldValue($model, $modelVerField);
             if ($update != ""){
                 $update .= ",";
             }
-            $update.=$versionField."='".$forVersion."'";
-            $sql = str_replace("{1}", $versionFilter, $sql);
+            $update .= $alias . "." .$versionField."=:_".$versionField;
+            $params["_".$versionField]=$forVersion;
         }
-        //添加版本控制代码完毕
 
         //执行操作
         $sql = str_replace("{0}", $update, $sql);
-        $sql = str_replace("{1}", $filter, $sql);
-        $_rows=$this->getDatabase()->execute($sql);
+        $sql = str_replace("{1}", $_filter, $sql);
+        $_rows=$this->getDatabase()->execute($sql,$params);
         if($_rows==0 && !empty($forVersion)){
             if (! $this->m_transactionStatus){
                 $this->getDatabase()->rollback();
@@ -567,7 +596,7 @@ class Dao implements IConfigurable
                     if ($_key == null || $_fkey == null){
                         continue;
                     }
-                    $keyField=$this->mapModelField($model, $_key);//映射到实体属性字段
+                    $keyField=EntityUtil::mapModelField($model, $_key);//映射到实体属性字段
                     if(empty($keyField)){
                         continue;
                     }
@@ -583,10 +612,10 @@ class Dao implements IConfigurable
 
                     // existing rows
                     $sql = "SELECT " . $pks . " FROM " . $_table . " " . $_alias . " JOIN " . $table . " " . $alias . " ON " . $_on . " WHERE " . $filter;
-                    $rs = $this->getDatabase()->query($sql);
+                    $rs = $this->getDatabase()->query($sql,$keyParams);
 
                     // index rows by keys
-                    $_rs = [];
+                    $existMap = [];
                     foreach ($rs as $row) {
                         $key_str = "";
                         foreach ($_tableObj->getPrimaryKeys() as $pk) {
@@ -595,42 +624,46 @@ class Dao implements IConfigurable
                             }
                             $key_str .= $row[$pk];
                         }
-                        $_rs[$key_str] = $row;
+                        $existMap[$key_str] = $row;
                     }
 
                     // scan this prop for set
-                    foreach ($model->$name as $row) {
+                    $many=EntityUtil::getFieldValue($model, $name);
+                    foreach ($many as $row) {
                         // $_key=null;//主表提供的键
                         // $_fkey=null;//从表提供的外键
 
-                        // //从表的外键从主表赋值,程序更新时不需要设置外键值
-                        $row[$_fkey] = $model->$keyField;
+                        //从表的外键从主表赋值,程序更新时不需要设置外键值
+                        //$row[$_fkey] = EntityUtil::getFieldValue($model, $keyField);
+                        $_fkeyValue=EntityUtil::getFieldValue($model, $keyField);
+                        EntityUtil::setDataFieldValue($row, $_fkey, $_fkeyValue);
 
                         // key string
                         $key_str = "";
                         foreach ($_tableObj->getPrimaryKeys() as $pk) {
-                            if ($key_str != ""){
-                                $key_str .= ",";
+                            $pk=EntityUtil::mapDataField($row, $pk);
+                            if(!empty($pk)){
+                                if ($key_str != ""){
+                                    $key_str .= ",";
+                                }
+                                $key_str .= EntityUtil::getDataFieldValue($row, $pk);
                             }
-                            if(!array_key_exists($pk, $row)){
-                                $pk=$this->mapArrayKey($row, $pk);
-                            }
-                            if(!array_key_exists($pk, $row)){
-                                throw new \Exception("实体'".get_class($model)."'的属性'".$name."'未提供主键'".$pk."'");
-                            }
-                            $key_str .= $row[$pk];
                         }
 
                         // if row exists
-                        if (array_key_exists($key_str, $_rs)) {
-                            $_row = $_rs[$key_str];//旧记录
+                        if (!empty($key_str) && array_key_exists($key_str, $existMap)) {
+                            $_row = $existMap[$key_str];//旧记录
                             if (count($_tableObj->getColumns()) > count($_tableObj->getPrimaryKeys())) {
                                 // update
                                 $_filter = "";
                                 $update = "";
+                                $params=[];
                                 foreach ($_tableObj->getColumns() as $col) {
-                                    $field = $col->getName();
+                                    $field = $col->getName();//数据库字段名
                                     $indexName=$field;
+                                    if($indexName==$_fkey){
+                                        continue;
+                                    }
 
                                     //驼峰属性优先取值
                                     if($humpFieldFirst){
@@ -638,12 +671,14 @@ class Dao implements IConfigurable
                                     }
 
                                     //如果驼峰属性不存在,则重新映射
-                                    if(!array_key_exists($indexName, $row)){
-                                        $indexName=$this->mapArrayKey($row, $field);
+//                                     if(!array_key_exists($indexName, $row)){
+//                                         $indexName=EntityUtil::mapDataField($row, $field);
+//                                     }
+                                    if(!EntityUtil::dataFieldExists($row, $indexName)){
+                                        $indexName=EntityUtil::mapDataField($row, $field);
                                     }
-
                                     //属性不存在,则放弃该字段的更新
-                                    if(empty($indexName) || !array_key_exists($indexName, $row)){
+                                    if(empty($indexName) || !EntityUtil::dataFieldExists($row, $indexName)){
                                         continue;
                                     }
                                     if (in_array($field, $_tableObj->getPrimaryKeys())) {
@@ -652,40 +687,31 @@ class Dao implements IConfigurable
                                         if ($_filter != ""){
                                             $_filter .= " AND ";
                                         }
-                                        if($col->getType()==Type::INTEGER || $col->getType()==Type::DOUBLE){
-                                            $_filter .= $_alias . "." . $field . "=" . $_row[$field];
-                                        }else{
-                                            $_filter .= $_alias . "." . $field . "='" . $_row[$field] . "'";
-                                        }
+                                        $_filter .= $_alias . "." . $field . "=:" . $field;
+                                        $params[$field]=EntityUtil::getDataFieldValue($_row, $field);
                                     } else if (! in_array($field, $_tableObj->getIncrementKeys())) {
                                         // 非主键,非自动递增字段
                                         if ($update != "")
                                             $update .= ",";
-                                            $_fieldValue = $row[$indexName];
-                                            if ($_fieldValue === null || ($_fieldValue === "" && $col->getType() != Type::STRING)) {
-                                                $update .= $_alias . "." . $field . "=NULL";
-                                            } else if($col->getType()==Type::INTEGER || $col->getType()==Type::DOUBLE){
-                                                $update .= $_alias . "." . $field . "=" . $_fieldValue;
-                                            }else {
-                                                $update .= $_alias . "." . $field . "='" . Convert::toDbString($_fieldValue) . "'";
-                                            }
-                                            //$update .= $_alias . "." . $field . "='" . convert::toDbString($row[$field]) . "'";
+                                            $update .= $_alias . "." . $field . "=:".$field;
+                                            $params[$field]=EntityUtil::getDataFieldValue($row, $indexName);
                                     }
                                 }
                                 $sql = "UPDATE " . $_table . " " . $_alias . " SET {0} WHERE {1};";
                                 $sql = str_replace("{0}", $update, $sql);
                                 $sql = str_replace("{1}", $_filter, $sql);
                                 if(!empty($update) && !empty($_filter)){
-                                    $this->getDatabase()->execute($sql);
+                                    $this->getDatabase()->execute($sql,$params);
                                 }
                             }
 
                             // remove this row
-                            unset($_rs[$key_str]);
+                            unset($existMap[$key_str]);
                         }else {
                             //if row not exists,then insert
                             $fields = "";
                             $values = "";
+                            $params=[];
                             foreach ($_tableObj->getColumns() as $col) {
                                 //字段名与映射字段名
                                 $field = $col->getName();
@@ -693,19 +719,21 @@ class Dao implements IConfigurable
                                 if($humpFieldFirst){
                                     $indexName=StringUtil::toHumpString($field);
                                 }
-                                if(!array_key_exists($indexName, $row)){
-                                    $indexName=$this->mapArrayKey($row, $field);
+                                if(!EntityUtil::dataFieldExists($row, $indexName)){
+                                    $indexName=EntityUtil::mapDataField($row, $field);
                                 }
-                                if(empty($indexName) || !array_key_exists($indexName, $row)){
+                                if(empty($indexName) || !EntityUtil::dataFieldExists($row, $indexName)){
                                     continue;
                                 }
 
                                 //字段值
                                 $value = null;
                                 if ($field == $_fkey) {
-                                    $value = $model->$keyField;//从表的外键从实体主键取值
+                                    //$value = $model->$keyField;//从表的外键从实体主键取值
+                                    $value=EntityUtil::getFieldValue($model, $keyField);
                                 } else{
-                                    $value = $row[$indexName];
+                                    //$value = $row[$indexName];
+                                    $value=EntityUtil::getDataFieldValue($row, $indexName);
                                 }
 
                                 if (! in_array($field, $_tableObj->getIncrementKeys()) && $value != null) {
@@ -719,33 +747,31 @@ class Dao implements IConfigurable
                                     if ($values != ""){
                                         $values .= ",";
                                     }
-                                    if ($value === null || ($value === "" && $col->getType() != Type::STRING)) {
-                                        $values .= "NULL";
-                                    } else if($col->getType()==Type::INTEGER || $col->getType()==Type::DOUBLE){
-                                        $values.=$value;
-                                    }else {
-                                        $values .= "'" . Convert::toDbString($value) . "'";
-                                    }
+                                    $values.=":".$field;
+                                    $params[$field]=$value;
                                 }
                             }
                             $sql = "INSERT INTO " . $_table . " ({0}) VALUES ({1});";
                             $sql = str_replace("{0}", $fields, $sql);
                             $sql = str_replace("{1}", $values, $sql);
-                            $this->getDatabase()->execute($sql);
+                            $this->getDatabase()->execute($sql,$params);
                         }
                     }
 
                     // delete not existing row
-                    foreach ($_rs as $row) {
+                    foreach ($existMap as $row) {
                         $_filter = "";
+                        $_params=[];
                         foreach ($_tableObj->getPrimaryKeys() as $pk) {
                             if ($_filter != ""){
                                 $_filter .= " AND ";
                             }
-                            $_filter .= $pk . "='" . $row[$pk] . "'";
+                            //$_filter .= $pk . "='" . $row[$pk] . "'";
+                            $_filter .= $pk . "=:" . $pk;
+                            $_params[$pk]= $row[$pk];
                         }
                         $sql = "DELETE FROM " . $_table . " WHERE " . $_filter . ";";
-                        $this->getDatabase()->execute($sql);
+                        $this->getDatabase()->execute($sql,$_params);
                     }
                 }
             }
@@ -766,7 +792,7 @@ class Dao implements IConfigurable
 
     /**
      * 删除一条记录,成功返回影响记录数1,失败返回false
-     * @param unknown $model
+     * @param object $model
      */
     public function delete($model)
     {
@@ -782,23 +808,23 @@ class Dao implements IConfigurable
 
         // 删除过滤
         $filter = "";
+        $params=[];
         foreach ($primaryKeys as $keyField) {
-            $field=$this->mapModelField($model, $keyField);
+            $field=EntityUtil::mapModelField($model, $keyField);
             if(empty($field)){
                 throw new \Exception("实体'".get_class($model)."'不包含主键字段'".$keyField."'");
             }
             if ($filter != ""){
                 $filter .= " AND ";
             }
-            $filter .= $alias . "." . $keyField . "='" . $model->$field. "'";
+            $filter .= $alias . "." . $keyField . "=:" . $keyField;
+            $params[$keyField]=EntityUtil::getFieldValue($model, $field);
         }
 
         // sql语句组
         $sql_array = [];
 
-        // 删除关联表记录(sets标记不能同步删除)
-
-        // 删除关联表记录(dels标记)
+        // 删除关联表记录(dels标记,sets标记不能同步删除)
         foreach ($dels as $del) {
             $sql = "DELETE {0} FROM " . $table . " " . $alias;
             $joins = $del->getJoins();
@@ -824,7 +850,7 @@ class Dao implements IConfigurable
 //         var_dump($sql_array);
 //         exit;
         foreach ($sql_array as $sql) {
-            $intRows = $this->getDatabase()->execute($sql);
+            $intRows = $this->getDatabase()->execute($sql,$params);
             if ($intRows === false){
                 break;
             }
@@ -848,7 +874,7 @@ class Dao implements IConfigurable
      * @param string $modelClass
      * @param string $filter
      */
-    public function deletes($modelClass, $filter = "")
+    public function deletes($modelClass, $filter = "",array $params=[])
     {
         $table = $this->getOrmConfig()->getTable($modelClass)->getName();
         $sql = "DELETE FROM " . $table;
@@ -856,155 +882,146 @@ class Dao implements IConfigurable
             $filter=$this->mapSqlExpression($modelClass, $filter);
             $sql .= " WHERE " . $filter;
         }
-        return $this->getDatabase()->execute($sql);
+        return $this->getDatabase()->execute($sql,$params);
     }
 
     /**
-     *
-     * @param mixed $modelClass
-     * @param string $filter 主表或关联表过滤字段(看参数$joinFilter参数是否为true)
-     * @param string $sort 主表排序字段
-     * @param number $offset
-     * @param number $length
-     * @param string $fields
-     * @param bool $toHumpFields
-     * @param string $groupBy
-     * @param bool $joinFilter 是否关联过滤
+     * 数据查询
+     * @param string $modelClass        实体类型名
+     * @param string $filter            过滤表达式
+     * @param array $params             输入参数
+     * @param string $sort              排序表达式
+     * @param number $offset            起始记录号
+     * @param number $length            返回记录数
+     * @param string $aliasToEntityMap  是否返回实体数组,否则返回二维键值对数组(默认false)
+     * @param string $withManyToOne     是否返回多对一的上级数据(默认true)
+     * @param string $toHumpFields      是否复制到驼峰命名的字段(默认true);返回实体数组时无效
+     * @param string $fields            查询主表字段名,指定字段名可以简化返回结果,提高查询效率
      */
-    public function select($modelClass, $filter = "", $sort = "", $offset = 0, $length = -1,$withManyToOne=true, $fields = "",$toHumpFields=true, $groupBy = "", $joinFilter = false)
+    public function select($modelClass, $filter = "",array $params=[], $sort = "", $offset = 0, $length = -1,$aliasToEntityMap=false,$withManyToOne=true,$toHumpFields=true, $fields = "")
     {
         // mapping config
         $tableObj = $this->getOrmConfig()->getTable($modelClass);
-        $table = $tableObj->getName();
-        $alias = $tableObj->getAlias();
-        if(empty($alias)){
-            $alias="_".$table;
+
+        //返回字段名
+        if(empty($fields)){
+            $fields="*";
         }
-        $select = $tableObj->getSelectJoin();
-        $manyToOneJoins=$tableObj->getManyToOneJoins();
+        //$fields=$this->mapSqlExpression($modelClass, $fields);
+        $fields=$this->addAliasToFieldExp($fields, $tableObj->getAlias());
+
+        //join sql
+        $allJoins=[];
+
+        //过滤表达式
+        $joins = $this->compileManyToOneExp($tableObj->getManyToOneJoins(), $filter);
+        foreach ($joins as $_alias => $join){
+            if(!array_key_exists($_alias, $allJoins)){
+                $allJoins[$_alias]=$join;
+            }
+        }
+
+        //排序表达式
+        $joins = $this->compileManyToOneExp($tableObj->getManyToOneJoins(), $sort);
+        foreach ($joins as $_alias => $join){
+            if(!array_key_exists($_alias, $allJoins)){
+                $allJoins[$_alias]=$join;
+            }
+        }
+
+        //是否返回多对一的上级数据(默认true)
+        $manyToOneFieldMap=[];
+        if($withManyToOne){
+            $joins=$this->compileManyToOneColumns($tableObj->getManyToOneJoins(), $manyToOneFieldMap);
+            foreach ($joins as $_alias => $join){
+                if(!array_key_exists($_alias, $allJoins)){
+                    $allJoins[$_alias]=$join;
+                }
+            }
+            //列信息集:键为数据库真实返回的列名,值("target":一方名称,"field":一方字段名,"query":查询输入的列名)
+            if(!empty($manyToOneFieldMap)){
+                foreach ($manyToOneFieldMap as $oneQueryField){
+                    $fields.=",".$oneQueryField["query"];
+                }
+            }
+        }
 
         //sql
-        $sql = "SELECT {COLUMNS} FROM " . $table;
+        $lineEnd=$this->m_debug?"\r\n":"";
+        $sql = "SELECT ".$fields." FROM " . $tableObj->getName()." ".$tableObj->getAlias().$lineEnd;
+
+        //joins
+        foreach ($allJoins as $join){
+            $sql.=" LEFT JOIN ".$join->getTable()." ".$join->getAlias()." ON ".$join->getOn().$lineEnd;
+        }
+
+        //过滤
         if (!empty($filter)){
-            $sql .= " WHERE " . $filter;
+            $sql .= " WHERE " . $filter.$lineEnd;
         }
 
-        //多对一字段映射
-        $manyToOneFieldMap=[];
-
-        //没有配置映射,通用写法
-        if (empty($select)) {
-            if(empty($manyToOneJoins)){
-                //没有多对一的查询
-                if ($fields == ""){
-                    $fields = "*";
-                }
-                $sql = str_replace("{COLUMNS}", $fields, $sql);
-                //$sql="SELECT ".$alias.".".$
-                if (trim($groupBy) != ""){
-                    $sql .= " GROUP BY " . $groupBy;
-                }
-                if (trim($sort) != ""){
-                    $sql .= " ORDER BY " . $sort;
-                }
-            }else if($withManyToOne){
-                //具有多对一的查询
-                $sql = str_replace("{COLUMNS}", "*", $sql);
-                $sql = "SELECT {COLUMNS} FROM (" . $sql . ") " . $alias;
-                if ($fields == ""){
-                    $fields = "*";
-                }
-                $fields=$this->addAliasToFieldExp($fields, $alias);
-
-                $oneFields="";  //一方的列
-                $joinSql="";    //join语句
-                $this->selectManyToOneJoins($manyToOneJoins, $oneFields, $joinSql,$manyToOneFieldMap);
-                if(!empty($oneFields) && !empty($joinSql)){
-                    $fields.=",".$oneFields;
-                    $sql.=$joinSql;
-                }
-                $sql = str_replace("{COLUMNS}", $fields, $sql);
-//                 echo $sql;
-//                 exit;
-                if (trim($groupBy) != ""){
-                    $sql .= " GROUP BY " . $this->addAliasToFieldExp($groupBy, $alias);
-                }
-                if (trim($sort) != ""){
-                    $sql .= " ORDER BY " . $this->addAliasToFieldExp($sort, $alias);
-                }
-//                 echo $sql;
-//                 exit;
-            }
-        } else {
-            //配置映射
-            if ($joinFilter) {
-                $sql = "SELECT {COLUMNS} FROM " . $table . " " . $alias;
-            } else {
-                $sql = str_replace("{COLUMNS}", "*", $sql);
-                $sql = "SELECT {COLUMNS} FROM (" . $sql . ") " . $alias;
-            }
-
-            $_fields = $alias . ".*";
-            $cols = $select->getColumns();
-            if (! empty($cols)){
-                $_fields = $cols;
-            }
-            if (! empty($fields)){
-                $_fields = $fields;
-            }
-
-            //关联过滤
-            foreach ($select->getJoins() as $join) {
-                $_table = $join->getTable();
-                $_alias = $join->getAlias();
-                $_on = $join->getOn();
-                $sql .= " LEFT JOIN " . $_table . " " . $_alias . " ON " . $_on;
-            }
-
-            // fields
-            $fields = $this->addAliasToFieldExp($_fields, $alias);
-
-            //启用多对一查询
-            if($withManyToOne){
-                $oneFields="";  //一方的列
-                $joinSql="";    //join语句
-                $this->selectManyToOneJoins($manyToOneJoins, $oneFields, $joinSql,$manyToOneFieldMap);
-                if(!empty($oneFields) && !empty($joinSql)){
-                    $fields.=",".$oneFields;
-                    $sql.=$joinSql;
-                }
-            }
-
-            // group
-            $_group = $this->addAliasToFieldExp($groupBy, $alias);
-            if (trim($_group) != "")
-                $sql .= " GROUP BY " . $_group;
-
-            // join filter
-            if ($joinFilter && ! empty($filter)) {
-                $sql .= " WHERE " . $filter;
-            }
-
-            // order
-            $_order = $this->addAliasToFieldExp($sort, $alias);
-            if (trim($_order) != ""){
-                $sql .= " ORDER BY " . $_order;
-            }
-            $sql = str_replace("{COLUMNS}", $fields, $sql);
-// echo $sql."\r\n";
-// exit;
+        //排序
+        if(!empty($sort)){
+            $sql.=" ORDER BY ".$sort.$lineEnd;
         }
+
+        //查询
         $sql=$this->mapSqlExpression($modelClass, $sql);
-//                     echo $sql."\r\n";
-//                     exit;
-        $rs = $this->getDatabase()->query($sql, $offset, $length);
+        $rs = $this->getDatabase()->query($sql,$params, $offset, $length);
 
+//         var_dump($rs);
+//         exit;
+        if(empty($rs)){
+            return $rs;
+        }
+//         * @param string $aliasToEntityMap  是否返回实体数组,否则返回二维键值对数组(默认false)
+//         * @param string $withManyToOne     是否返回多对一的上级数据(默认true)
+//         * @param string $toHumpFields      是否复制到驼峰命名的字段(默认true);返回实体数组时无效
 
-        //拆分多对一的字段为数组
-        if(count($rs)>0){
-            $keys=array_keys($rs[0]);
-            for($i=0;$i<count($rs);$i++){
-                $line=$rs[$i];
+        $lines=[];
+        $keys=array_keys($rs[0]);
+        for($i=0;$i<count($rs);$i++){
+            $line=$rs[$i];
+            if($aliasToEntityMap){
+                //装配到实体数组
+                $entity=new $modelClass();
+                $many2one=[];
+                $entityFieldMap=[];
+                $oneFieldMap=[];
+                foreach ($line as $key=>$value){
+                    if(array_key_exists($key, $manyToOneFieldMap)){
+                        //many2one的字段
+                        $map=$manyToOneFieldMap[$key];
+                        $name=$map["target"];
+                        $fd=$map["field"];
+                        $class=$map["class"];
+                        if(!array_key_exists($name, $many2one)){
+                            $many2one[$name]=new $class();
+                            $oneFieldMap[$name]=[];
+                        }
+                        $oneObject=$many2one[$name];
+                        $fieldMap=$oneFieldMap[$name];
+                        if(!array_key_exists($fd, $fieldMap)){
+                            $fieldMap[$fd]=EntityUtil::mapModelField($oneObject, $fd);
+                            $oneFieldMap[$name]=$fieldMap;
+                        }
+                        $field=$fieldMap[$fd];
+                        EntityUtil::setFieldValue($oneObject, $field, $value);
+                        unset($line[$key]);
+                    }else{
+                        if(!array_key_exists($key, $entityFieldMap)){
+                            $entityFieldMap[$key]=EntityUtil::mapModelField($entity, $key);
+                        }
+                        $field=$entityFieldMap[$key];
+                        EntityUtil::setFieldValue($entity, $field, $value);
+                    }
+                }
+                foreach ($many2one as $name=>$oneObj){
+                    EntityUtil::setFieldValue($entity, $name, $oneObj);
+                }
+                $lines[$i]=$entity;
+            }else{
+                //装配到二维数组
                 $many2one=[];
                 foreach ($line as $key=>$value){
                     if(array_key_exists($key, $manyToOneFieldMap)){
@@ -1025,8 +1042,8 @@ class Dao implements IConfigurable
                             }
                         }
                         unset($line[$key]);
-
                     }else if($toHumpFields){
+                        ////转换为驼峰命名的列
                         if(!is_numeric($key)){
                             $key=StringUtil::toHumpString($key);
                             if(!array_key_exists($key, $keys)){
@@ -1038,28 +1055,11 @@ class Dao implements IConfigurable
                 if(!empty($many2one)){
                     $line=array_merge($line,$many2one);
                 }
-                $rs[$i]=$line;
+                $lines[$i]=$line;
             }
         }
 
-        //转换为驼峰命名的列
-        if($toHumpFields && count($rs)>0){
-            $keys=array_keys($rs[0]);
-            for($i=0;$i<count($rs);$i++){
-                $dr=$rs[$i];
-                foreach ($dr as $key=>$value){
-                    if(!is_numeric($key)){
-                        $key=StringUtil::toHumpString($key);
-                        if(!array_key_exists($key, $keys)){
-                            $dr[$key]=$value;
-                        }
-                    }
-                }
-                $rs[$i]=$dr;
-            }
-        }
-
-        return $rs;
+        return $lines;
     }
 
     /**
@@ -1069,44 +1069,37 @@ class Dao implements IConfigurable
      * @param string $joinFilter
      * @return array
      */
-    public function count($modelClass, $filter = "", $joinFilter = false)
+    public function count($modelClass, $filter = "",array $params=[])
     {
         // mapping config
         $tableObj = $this->getOrmConfig()->getTable($modelClass);
         $table = $tableObj->getName();
-        $alias = $tableObj->getAlias();
-        $select = $tableObj->getSelectJoin();
+        $sql="SELECT COUNT(*) FROM ".$table." ".$tableObj->getAlias();
 
-        $filter=$this->mapSqlExpression($modelClass,$filter,$joinFilter);
-
-        if ($joinFilter && ! empty($select)) {
-            $sql = "SELECT COUNT(*) FROM " . $table . " " . $alias;
-            foreach ($select->getJoins() as $join) {
-                $_table = $join->getTable();
-                $_alias = $join->getAlias();
-                $_on = $join->getOn();
-                $sql .= " LEFT JOIN " . $_table . " " . $_alias." ON ".$_on;
+        //一对多的过滤
+        $joins=$this->compileManyToOneExp($tableObj->getManyToOneJoins(), $filter);
+        if(!empty($joins)){
+            foreach ($joins as $_alias => $_join){
+                $sql.=" JOIN ".$_join->getTable()." ".$_alias." ON ".$_join->getOn()."\r\n";
             }
-            $sql .= " WHERE ".$filter;
-        }else{
-            $sql="SELECT COUNT(*) FROM ".$table."";
-            if(trim($filter) != "")
-                $sql .= " WHERE ".$filter;
         }
-        //         echo $sql;
-        //         exit;
-        return $this->getDatabase()->scalar($sql);
+        if(trim($filter) != ""){
+            $sql .= " WHERE ".$filter;
+        }
+        $sql=$this->mapSqlExpression($modelClass,$sql,true);
+        return $this->getDatabase()->scalar($sql,$params);
     }
 
     /**
      * 数据聚合统计(函数名必须与对应的数据库一致)
      * @param string|object $modelClass  模型类名或实例
      * @param string $filter             过滤表达式
+     * @param array $params              输入参数
      * @param string $sort               排序表达式
-     * @param array $funcMap             统计函数,键为函数名,值为统计字段;至少包含一个元素
+     * @param array $funcMap             统计函数,键为函数名,值为统计字段(值为数组时,第一个元素为统计字段,第二个为返回字段);至少包含一个元素
      * @param array $groupFields         分组统计字段,可选
      */
-    public function group($modelClass,$filter = "",$sort="",$funcMap=[],$groupFields=[])
+    public function group($modelClass,$filter = "",array $params=[],$sort="",$funcMap=[],$groupFields=[])
     {
         if(empty($funcMap)){
             return false;
@@ -1118,17 +1111,28 @@ class Dao implements IConfigurable
             if(!empty($sql)){
                 $sql.=",";
             }
-            $sql.=$func."(".$table->getAlias().".".$fd.") AS ".$fd;
+            $_fd=$fd;
+            $_returnFd=$fd;
+            if(is_array($fd)){
+                $_fd=$fd[0];
+                $_returnFd=$fd[1];
+            }
+            $sql.=$func."(".$table->getAlias().".".$_fd.") AS ".$_returnFd;
         }
-        foreach ($groupFields as $fd){
-            if(!empty($sql)){
-                $sql.=",";
+        if(!is_array($groupFields) && !empty($groupFields)){
+            $groupFields=[$groupFields];
+        }
+        if(!empty($groupFields)){
+            foreach ($groupFields as $fd){
+                if(!empty($sql)){
+                    $sql.=",";
+                }
+                $sql.=$table->getAlias().".".$fd;
+                if(!empty($groupBy)){
+                    $groupBy.=",";
+                }
+                $groupBy.=$fd;
             }
-            $sql.=$table->getAlias().".".$fd;
-            if(!empty($groupBy)){
-                $groupBy.=",";
-            }
-            $groupBy.=$fd;
         }
 
 
@@ -1137,25 +1141,26 @@ class Dao implements IConfigurable
             $sql.=" WHERE ".$filter;
         }
         if(!empty($groupBy)){
-            $sql.=" GROUP BY ".$groupBy;
+            $sql.=" GROUP BY ".$this->addAliasToFieldExp($groupBy, $table->getAlias());
         }
         if(!empty($sort)){
-            $sql.=" ORDER BY ".$sort;
+            $sql.=" ORDER BY ".$this->addAliasToFieldExp($sort, $table->getAlias());
         }
         $sql=$this->mapSqlExpression($modelClass, $sql);
-        return $this->getDatabase()->query($sql);
+        return $this->getDatabase()->query($sql,$params);
     }
 
     /**
-     * 原生SQL执行
-     * @param unknown $sql
+     * 执行原生SQL语句
+     * @param string $sql   SQL语句
+     * @param array $params 输入参数
      */
-    public function sqlUpdate($sql)
+    public function sqlUpdate($sql,array $params=[])
     {
         if(!$this->m_transactionStatus){
             $this->getDatabase()->begin();
         }
-        $rs=$this->getDatabase()->execute($sql);
+        $rs=$this->getDatabase()->execute($sql,$params);
 
         if (is_null($this->getException())) {
             if (! $this->m_transactionStatus){
@@ -1172,205 +1177,14 @@ class Dao implements IConfigurable
 
     /**
      * 原生SQL查询
-     * @param string $sql 原生SQL
-     * @param int $offset
-     * @param int $limit
-     * @return array
+     * @param string $sql
+     * @param array $params
+     * @param number $offset
+     * @param number $limit
      */
-    public function sqlQuery($sql,$offset=0,$limit=-1)
+    public function sqlQuery($sql,array $params=[],$offset=0,$limit=-1)
     {
-        return $this->getDatabase()->query($sql,$offset,$limit);
-    }
-
-    /**
-     * 数据字段名映射到模型属性名
-     * @param mixed $model 模型实例或模型名称
-     * @param string $dbField 数据库字段名
-     */
-    public function mapModelField($model,$dbField)
-    {
-        //与表字段名一致
-        if(property_exists($model, $dbField)){
-            return $dbField;
-        }
-
-        //转为小写起的驼峰名
-        $fd=StringUtil::toHumpString($dbField);
-        if(property_exists($model, $fd)){
-            return $fd;
-        }
-
-        //转为大写起的驼峰名
-        $fd=ucfirst($fd);
-        if(property_exists($model, $fd)){
-            return $fd;
-        }
-        return false;
-    }
-
-    /**
-     * 数据字段名映射到数组键名
-     * @param array $array
-     * @param string $dbField
-     */
-    public function mapArrayKey(array $array,$dbField)
-    {
-        //与表字段名一致
-        if(array_key_exists($dbField, $array)){
-            return $dbField;
-        }
-
-        //转为小写起的驼峰名
-        $fd=StringUtil::toHumpString($dbField);
-        if(array_key_exists($fd, $array)){
-            return $fd;
-        }
-
-        //转为大写起的驼峰名
-        $fd=ucfirst($fd);
-        if(array_key_exists($fd, $array)){
-            return $fd;
-        }
-        return false;
-
-    }
-
-    /**
-     * 映射翻译过滤表达式
-     * @param Table $table
-     * @param string $filter
-     * @return string
-     */
-    public function mapSqlExpression($model,$expression,$mapJoins=false)
-    {
-        if(empty($expression)){
-            return $expression;
-        }
-        $table=$this->getOrmConfig()->getTable($model);
-        $tbl=$table->getName();
-        $alias=$table->getAlias();
-        $cols=$table->getColumnNames();
-
-        //替换有表前缀的表达式
-        $map=[];
-        foreach ($cols as $col){
-            $field=$this->mapModelField($model, $col);
-            if(!empty($field)){
-                $map[$col]=$field;
-                $replace=(empty($alias)?$tbl:$alias).".".$col;
-                $search=$tbl.".".$field;
-                $expression=str_replace($search, $replace, $expression);
-                $search=$alias.".".$field;
-                $expression=str_replace($search, $replace, $expression);
-            }
-        }
-
-        //替换关联表过滤.
-        if($mapJoins){
-            $selectJoin=$table->getSelectJoin();
-            if(!empty($selectJoin)){
-                //<join table="crm_customer" alias="c" on="c.id=o.customerId" />
-                $joins=$selectJoin->getJoins();
-                foreach ($joins as $join){
-                    //$_on=$join->getOn();
-                    $_tbl=$join->getTable();
-                    $_alias=$join->getAlias();
-                    $_table=new Table();
-                    $_table->setName($_tbl);
-                    $_table->setAlias($_alias);
-                    $this->getOrmConfig()->mappingColumns($_table);
-                    $cols=$_table->getColumnNames();
-                    foreach ($cols as $col){
-                        $replace=(empty($_alias)?$_tbl:$_alias).".".$col;
-                        $humpCol=StringUtil::toHumpString($col);
-
-                        $search=$_tbl.".".$humpCol;
-                        $expression=str_replace($search, $replace, $expression);
-                        $search=$_alias.".".$humpCol;
-                        $expression=str_replace($search, $replace, $expression);
-
-                        $search=$_tbl.".".ucfirst($humpCol);
-                        $expression=str_replace($search, $replace, $expression);
-                        $search=$_alias.".".ucfirst($humpCol);
-                        $expression=str_replace($search, $replace, $expression);
-                    }
-                }
-            }
-        }
-
-        //替换没有前缀的表达式
-        foreach ($map as $dbField=>$field){
-            $expression=str_replace($field, $dbField, $expression);
-        }
-
-        return $expression;
-    }
-
-    /**
-     * 加载一对多集合数据
-     * @param object $model 数据模型
-     * @param Table $tableObj 表对象
-     * @throws \Exception
-     */
-    private function loadOneToManyJoins($model,Table $tableObj)
-    {
-        $oneToManys=$tableObj->getOneToManyJoins();
-        $table=$tableObj->getName();
-        $alias=$tableObj->getAlias();
-        $primaryKeys = $tableObj->getPrimaryKeys();
-        foreach ($oneToManys as $name => $set) {
-            if(property_exists($model, $name)){
-                $joins = $set->getJoins();
-                $sql = " FROM " . $table . " " . $alias;
-                foreach ($joins as $join) {
-                    $_table = $join->getTable();
-                    $_alias = $join->getAlias();
-                    $_on = $join->getOn();
-                    $sql .= " JOIN " . $_table . " " . $_alias . " ON " . $_on;
-                }
-
-                $filter = "";
-                foreach ($primaryKeys as $keyField) {
-                    $field=$this->mapModelField($model, $keyField);
-                    if ($filter != ""){
-                        $filter .= " AND ";
-                    }
-                    if(empty($field)){
-                        throw new \Exception("实体'".get_class($model)."'不包含主键主段'".$keyField."'");
-                    }
-                    $filter .= $alias . "." . $keyField . "='" . $model->$field. "'";
-                }
-                $sql .= " WHERE " . $filter;
-
-                $fields = $set->getColumns();//需要提取的字段表达式
-                if ($fields == ""){
-                    $fields = "*";
-                }
-                $sql = "SELECT " . $fields . $sql;
-                $order = $set->getOrder();
-                if (! empty($order)){
-                    $sql .= " order by " . $order;
-                }
-                //echo $sql."\r\n";
-                // exit;
-                $_sets = $this->getDatabase()->query($sql);
-                if(count($_sets)>0){
-                    $first=$_sets[0];
-                    $keys=array_keys($first);
-                    for($i=0;$i<count($_sets);$i++){
-                        $row=$_sets[$i];
-                        foreach ($row as $col=>$val){
-                            $humpCol=StringUtil::toHumpString($col);
-                            if(!in_array($humpCol, $keys)){
-                                $row[$humpCol]=$val;
-                            }
-                        }
-                        $_sets[$i]=$row;
-                    }
-                }
-                $model->$name = $_sets;
-            }
-        }
+        return $this->getDatabase()->query($sql,$params,$offset,$limit);
     }
 
     /**
@@ -1390,7 +1204,7 @@ class Dao implements IConfigurable
                 continue;
             }
 
-            //目标表对象
+            //目标表对象(类型与表必须设置过映射,否则无法加载)
             $targetTableObj=$this->getOrmConfig()->getTable($class);
             if(empty($targetTableObj)||empty($targetTableObj->getName())){
                 continue;
@@ -1417,27 +1231,30 @@ class Dao implements IConfigurable
 
             //主表的过滤
             $filter = "";
+            $params=[];
             foreach ($tableObj->getPrimaryKeys() as $keyField) {
-                $field=$this->mapModelField($model, $keyField);
+                $field=EntityUtil::mapModelField($model, $keyField);
                 if ($filter != ""){
                     $filter .= " AND ";
                 }
                 if(empty($field)){
                     throw new \Exception("实体'".get_class($model)."'不包含主键主段'".$keyField."'");
                 }
-                $filter .= $tableObj->getAlias() . "." . $keyField . "='" . $model->$field. "'";
+                $filter .= $tableObj->getAlias() . "." . $keyField . "=:" . $keyField;
+                $params[$keyField]=EntityUtil::getFieldValue($model, $field);
             }
             $sql .= " WHERE " . $filter;
 
             //查询数据库
-            $reader=$this->getDatabase()->reader($sql);
+            $reader=$this->getDatabase()->reader($sql,$params);
             if ($reader && is_null($this->getDatabase()->getException())) {
                 //创建一方对象
-                $model->$name=new $class();
+                $oneObj=new $class();
                 foreach ($reader as $fieldName=> $value) {
-                    $field=$this->mapModelField($model->$name, $fieldName);
+                    $field=EntityUtil::mapModelField($oneObj, $fieldName);
                     if(!empty($field)){
-                        $model->$name->$field= $value;
+                        EntityUtil::setFieldValue($oneObj, $field, $value);
+                        EntityUtil::setFieldValue($model, $name, $oneObj);
                     }
                 }
             }
@@ -1446,90 +1263,183 @@ class Dao implements IConfigurable
     }
 
     /**
-     * 多对一查询语句
-     * @param array $manyToOneJoins
-     * @param string $columns
-     * @param string $joinSql
-     * @param boolean $toHumpFields
+     * 加载一对多集合数据
+     * @param object $model 数据模型
+     * @param Table $tableObj 表对象
+     * @param bool $aliasToEntity 映射到实体数组(映射端口必须提供class属性)
+     * @throws \Exception
      */
-    private function selectManyToOneJoins($manyToOneJoins,&$columns,&$joinSql,&$manyToOneFieldMap)
+    private function loadOneToManyJoins($model,Table $tableObj,$aliasToEntity)
     {
-        $tableMap=[];//alias:tableName
-        $colMap=[];//alias:[fields]
+        $oneToManys=$tableObj->getOneToManyJoins();
+        $table=$tableObj->getName();
+        $alias=$tableObj->getAlias();
+        $primaryKeys = $tableObj->getPrimaryKeys();
+        foreach ($oneToManys as $name => $set) {
+            if(!EntityUtil::fieldExists($model, $name)){
+                continue;
+            }
+            $joins = $set->getJoins();
+            $sql = " FROM " . $table . " " . $alias;
+            foreach ($joins as $join) {
+                $_table = $join->getTable();
+                $_alias = $join->getAlias();
+                $_on = $join->getOn();
+                $sql .= " JOIN " . $_table . " " . $_alias . " ON " . $_on;
+            }
+
+            $filter = "";
+            $params=[];
+            foreach ($primaryKeys as $keyField) {
+                $field=EntityUtil::mapModelField($model, $keyField);
+                if ($filter != ""){
+                    $filter .= " AND ";
+                }
+                if(empty($field)){
+                    throw new \Exception("实体'".get_class($model)."'不包含主键主段'".$keyField."'");
+                }
+                $filter .= $alias . "." . $keyField . "=:" . $keyField;
+                $params[$keyField]=EntityUtil::getFieldValue($model, $field);
+            }
+            $sql .= " WHERE " . $filter;
+
+            $fields = $set->getColumns();//需要提取的字段表达式
+            if ($fields == ""){
+                $fields = "*";
+            }
+            $sql = "SELECT " . $fields . $sql;
+            $order = $set->getOrder();
+            if (! empty($order)){
+                $sql .= " order by " . $order;
+            }
+            $_sets = $this->getDatabase()->query($sql,$params);
+
+            //class属性
+            $class=$set->getClass();
+            if(count($_sets)>0){
+                if($aliasToEntity && !empty($class) && class_exists($class)){
+                    //扩展到实体
+                    $objs=[];
+                    for($i=0;$i<count($_sets);$i++){
+                        $row=$_sets[$i];
+                        $obj=new $class();
+                        foreach ($row as $col=>$val){
+                            $field=EntityUtil::mapModelField($obj, $col);
+                            if(!empty($field)){
+                                EntityUtil::setFieldValue($obj, $field, $val);
+                            }
+                        }
+                        $objs[]=$obj;
+                    }
+                    EntityUtil::setFieldValue($model, $name, $objs);
+
+                }else {
+                    //扩展到数组
+                    $first=$_sets[0];
+                    $keys=array_keys($first);
+                    for($i=0;$i<count($_sets);$i++){
+                        $row=$_sets[$i];
+                        foreach ($row as $col=>$val){
+                            $humpCol=StringUtil::toHumpString($col);
+                            if(!in_array($humpCol, $keys)){
+                                $row[$humpCol]=$val;
+                            }
+                        }
+                        $_sets[$i]=$row;
+                    }
+                    EntityUtil::setFieldValue($model, $name, $_sets);
+                }
+            }
+        }
+    }
+
+    /**
+     * 编译多对一的返回列
+     * @param ManyToOneJoin[] $manyToOneJoins
+     * @param array $queryFieldMap              返回列信息集:键为数据库真实返回的列名,值("target":一方名称,"field":一方字段名,"query":查询输入的列名,"class":一方类名)
+     * @return Join[]                           返回已编译过的join，键为表别名
+     */
+    private function compileManyToOneColumns($manyToOneJoins,&$queryFieldMap)
+    {
+        $joinMap=[];
         foreach ($manyToOneJoins as $name=>$many2one){
-            //$many2one=new ManyToOneJoin();//test
             $joins=$many2one->getJoins();
             if(count($joins)==0){
                 continue;
             }
 
-            //join sql
-            $firstAlias="";
+            //一方的表对象(一方类型必须经过映射配置)
+            $oneClass=$many2one->getClass();
+            $oneTable=$this->getOrmConfig()->getTable($oneClass);
+            $oneTableName=$oneTable->getName();
+            //$oneAlias=$oneTable->getAlias();//此别名为原始配置的别名,不是多对一中配置的别名,此写法不可用
+
+            //join
+            $oneAlias="";
             foreach ($joins as $join){
-                //$join=new Join();//test
-                //join sql
-                $_table=$join->getTable();
                 $_alias=$join->getAlias();
-                if(!array_key_exists($_alias, $tableMap)){
-                    $joinSql.=" LEFT JOIN ".$_table." ".$_alias." ON ".$join->getOn();
+                if(!array_key_exists($_alias, $joinMap)){
+                    $joinMap[$_alias]=$join;
                 }
-                $tableMap[$_alias]=$_table;
-                if(empty($firstAlias)){
-                    $firstAlias=$_alias;
-                }
-            }
 
-            //列集
-            $fds=[];
-            $cols=$many2one->getColumns();
-            if(!empty($cols)){
-                $cols=explode(",", $cols);
-                foreach ($cols as $col){
-                    $alias="";
-                    $field=$col;
-                    $dotPos=strpos($col, ".");
-                    if($dotPos===false){
-                        $alias=$firstAlias;
-                    }else{
-                        $arr=explode(".", $col);
-                        $alias=$arr[0];
-                        $field=$arr[1];
-                    }
-
-                    //展开星号字段
-                    if($field=="*"){
-                        //重新映射列名
-                        if(!array_key_exists($alias, $colMap)){
-                            $_tableObj=new Table();
-                            $_tableObj->setName($tableMap[$alias]);
-                            $this->getOrmConfig()->mappingColumns($_tableObj);
-                            $colMap[$alias]=[];
-                            foreach ($_tableObj->getColumns() as $c){
-                                $colMap[$alias][]=$c->getName();
-                            }
-                        }
-
-                        //提取所有的列名
-                        foreach ($colMap[$alias] as $fd){
-                            $colName="_".$name."_".$fd;//数据库真实输出的列名
-                            $fds[]=$alias.".".$fd." AS ".$colName;
-                            $manyToOneFieldMap[$colName]=["target"=>$name,"field"=>$fd];
-                        }
-
-                    }else{
-                        $colName="_".$name."_".$field;
-                        $fds[]=$alias.".".$field." AS ".$colName;
-                        $manyToOneFieldMap[$colName]=["target"=>$name,"field"=>$field];
-                    }
+                //根据表名匹配别名
+                if($join->getTable()==$oneTableName){
+                    $oneAlias=$join->getAlias();
                 }
             }
-            if(!empty($fds)){
-                if(!empty($columns)){
-                    $columns.=",";
-                }
-                $columns.=implode(",", $fds);
+
+            //只需要返回一方的列,其它的抛弃
+            $cols=$oneTable->getColumnNames();
+            foreach ($cols as $col){
+                $colName="_".$name."_".$col;//数据库真实输出的列名(查询列别名)
+                $query=$oneAlias.".".$col." AS ".$colName;//向数据库查询输入的列名
+                $queryFieldMap[$colName]=["target"=>$name,"field"=>$col,"query"=>$query,"class"=>$oneClass];
             }
         }
+        return $joinMap;
+    }
+
+    /**
+     * 编译多对一的过滤表达式
+     * @param ManyToOneJoin[] $manyToOneJoins   ManyToOneJoin集
+     * @param string $exp                       待编译的过滤或排序表达式
+     * @return Join[]                           返回已编译过的join，键为表别名
+     */
+    private function compileManyToOneExp($manyToOneJoins,&$exp)
+    {
+        $_joins=[];
+        if(empty($exp)){
+            return [];
+        }
+        foreach ($manyToOneJoins as $name=>$one){
+            //写法:点号前后不能有空格
+            if(strpos($exp, $name.".")!==false){
+                $joins=$one->getJoins();
+                if(count($joins)==0){
+                    continue;
+                }
+                foreach ($joins as $join){
+                    $_alias=$join->getAlias();
+                    if(!in_array($_alias, $_joins)){
+                        $_joins[$_alias]=$join;
+                    }
+                }
+
+                //映射字段(一方类型必须经过映射配置)
+                $class=$one->getClass();
+                $_tableObj=$this->getOrmConfig()->getTable($class);
+                foreach ($_tableObj->getColumnNames() as $dbField){
+                    $field=EntityUtil::mapModelField($class, $dbField);
+                    $space=" ";
+                    if(strpos($exp, $name.".")===0){
+                        $space="";
+                    }
+                    $exp=str_replace($space.$name.".".$dbField, $space.$_alias.".".$dbField, $exp);
+                    $exp=str_replace($space.$name.".".$field, $space.$_alias.".".$dbField, $exp);
+                }
+            }
+        }
+        return $_joins;
     }
 
     /**
@@ -1558,30 +1468,63 @@ class Dao implements IConfigurable
     }
 
     /**
-     * 从on关联条件分解键名
-     * @param string $on
-     * @param string $table1
-     * @param string $alias1
-     * @param string $table2
-     * @param string $alias2
-     * @param string $key1
-     * @param string $key2
+     /**
+     * 映射翻译过滤表达式
+     * @param Table $table
+     * @param string $filter
+     * @param bool $autoAppendAlias 是否自动加上别名
+     * @return string
      */
-    private function matchKeys($on,$table1,$alias1,$table2,$alias2,&$key1,&$key2)
+    private function mapSqlExpression($model,$expression,$autoAppendAlias=false)
     {
-        //// 从关联条件分解外键与主表字段
-        $key1 = "";
-        $key2 = "";
-        $key_arr = explode("=", $on);
-        foreach ($key_arr as $key_str) {
-            $_key_arr = explode(".", $key_str);
-            $_tbl = $_key_arr[0];
-            if ($_tbl == $table1 || $_tbl == $alias1){
-                $key1 = $_key_arr[1];
-            }
-            if ($_tbl == $table2 || $_tbl == $alias2){
-                $key2 = $_key_arr[1];
+        if(empty($expression)){
+            return $expression;
+        }
+        $table=$this->getOrmConfig()->getTable($model);
+        $tbl=$table->getName();
+        $alias=$table->getAlias();
+        $cols=$table->getColumnNames();
+
+        //保护参数占位符
+        $pattern="/:([\w]{1,})/";
+        $matches=[];
+        preg_match_all($pattern, $expression,$matches);
+        $paramMap=[];
+        foreach ($matches[1] as $paramName){
+            $key=SecurityUtil::newGuid();
+            $paramMap[$key]=$paramName;
+            $expression=str_replace(":".$paramName, ":".$key, $expression);
+        }
+
+        //替换有表前缀的表达式
+        $map=[];
+        foreach ($cols as $col){
+            $field=EntityUtil::mapModelField($model, $col);
+            if(!empty($field)){
+                $map[$col]=$field;
+                $replace=(empty($alias)?$tbl:$alias).".".$col;
+                $search=$alias.".".$field;
+                $expression=str_replace($search, $replace, $expression);
             }
         }
+
+        //替换没有前缀的表达式
+        foreach ($map as $dbField=>$field){
+            $replace=$dbField;
+            if($autoAppendAlias){
+                $replace=(empty($alias)?$tbl:$alias).".".$dbField;
+            }
+            //$space=strpos($expression, $field)===0?"":" ";
+            $space="";
+            $expression=str_replace($space.$field, $space.$replace, $expression);
+        }
+
+        //恢复输入参数占位符
+        foreach ($paramMap as $key=>$value){
+            $expression=str_replace(":".$key, ":".$value, $expression);
+        }
+
+        return $expression;
     }
+
 }

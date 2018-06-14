@@ -96,7 +96,10 @@ class XmlConfiguration implements IConfiguration
      */
     public function getConfigValues($section)
     {
-        return $this->m_configArray[$section];
+        if(array_key_exists($section, $this->m_configArray)){
+            return $this->m_configArray[$section];
+        }
+        return [];
     }
 
     /**

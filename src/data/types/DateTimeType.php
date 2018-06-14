@@ -12,6 +12,6 @@ class DateTimeType extends Type
      * 类型名称
      * @var string
      */
-    private $m_type=Type::DATETIME;
+    private $m_typeName=Type::DATETIME;
 }
 

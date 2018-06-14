@@ -15,17 +15,36 @@ use swiftphp\core\io\Path;
  */
 class Container
 {
+
     /**
-     * 当前运行的配置实例
-     * @var IConfiguration
+     * 初始化参数配置键
+     * @var string
      */
-    private $m_config = null;
+    private static $PARAMS_CONFIG_KEY="params";
+
+    /**
+     * 过滤器配置键
+     * @var string
+     */
+    private static $FILTERS_CONFIG_KEY="filters";
+
+    /**
+     * 监听器配置键
+     * @var string
+     */
+    private static $LISTENERS_CONFIG_KEY="listeners";
 
     /**
      * 容器所在配置节
      * @var string
      */
     private $m_configSection = "container";
+
+    /**
+     * 当前运行的配置实例
+     * @var IConfiguration
+     */
+    private $m_config = null;
 
     /**
      * 上下文
@@ -110,13 +129,13 @@ class Container
      */
     public static function run(Container $instance)
     {
-        $instance->load();
+        $instance->execute();
     }
 
     /**
      *容器执行主入口
      */
-    private function load()
+    public function execute()
     {
         try{
             //初始化参数
@@ -180,8 +199,8 @@ class Container
 
         //容器节点的配置值(相同属性名覆盖)
         $_configData=$this->m_config->getConfigValues($this->m_configSection);
-        if(!empty($_configData) && array_key_exists("params", $_configData)){
-            $_configData=$_configData["params"];
+        if(!empty($_configData) && array_key_exists(self::$PARAMS_CONFIG_KEY, $_configData)){
+            $_configData=$_configData[self::$PARAMS_CONFIG_KEY];
             foreach ($_configData as $key=>$value){
                 $configData[$key]=$value;
             }
@@ -262,10 +281,10 @@ class Container
     private function initFilters()
     {
         $_configValues=$this->m_config->getConfigValues($this->m_configSection);
-        if(!array_key_exists("filters", $_configValues)){
+        if(!array_key_exists(self::$FILTERS_CONFIG_KEY, $_configValues)){
             return;
         }
-        $filterConfigs=$_configValues["filters"];
+        $filterConfigs=$_configValues[self::$FILTERS_CONFIG_KEY];
         if(empty($filterConfigs)){
             return;
         }
@@ -282,10 +301,10 @@ class Container
     private function initListeners()
     {
         $_configValues=$this->m_config->getConfigValues($this->m_configSection);
-        if(!array_key_exists("listeners", $_configValues)){
+        if(!array_key_exists(self::$LISTENERS_CONFIG_KEY, $_configValues)){
             return;
         }
-        $listenerConfigs=$_configValues["listeners"];
+        $listenerConfigs=$_configValues[self::$LISTENERS_CONFIG_KEY];
         if(empty($listenerConfigs)){
             return;
         }

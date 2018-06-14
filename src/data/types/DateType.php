@@ -12,6 +12,6 @@ class DateType extends Type
      * 类型名称
      * @var string
      */
-    private $m_type=Type::DATE;
+    private $m_typeName=Type::DATE;
 }
 

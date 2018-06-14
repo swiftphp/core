@@ -8,7 +8,6 @@ namespace swiftphp\core\web;
  */
 class HtmlHelper
 {
-
     /**
      * 读取标签属性
      * @param string $outerHtml
@@ -30,6 +29,22 @@ class HtmlHelper
             $arr_array[$key]=$value;
         }
         return $arr_array;
+    }
+
+    /**
+     * 获取标签内部内容
+     * @param string $outerHtml
+     * @param string $tagName
+     * @return string
+     */
+    public static function getTagInnerHtml($outerHtml,$tagName)
+    {
+        $pattern="/<".$tagName." [^>]*>(.*)<\/".$tagName.">/s";
+        $matches=[];
+        if(preg_match($pattern, $outerHtml,$matches)){
+            return $matches[1];
+        }
+        return "";
     }
 }
 

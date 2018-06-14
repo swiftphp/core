@@ -48,7 +48,7 @@ abstract class Type
      * 类型名称
      * @var string
      */
-    protected $m_type=Type::STRING;
+    protected $m_typeName=Type::STRING;
 
     /**
      * 类型映射
@@ -71,10 +71,11 @@ abstract class Type
 
     /**
      * 获取类型名
+     * @return string
      */
     public function getName()
     {
-        return $this->m_type;
+        return $this->m_typeName;
     }
 
     /**

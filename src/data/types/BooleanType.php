@@ -12,6 +12,6 @@ class BooleanType extends Type
      * 类型名称
      * @var string
      */
-    private $m_type=Type::BOOLEAN;
+    private $m_typeName=Type::BOOLEAN;
 }
 

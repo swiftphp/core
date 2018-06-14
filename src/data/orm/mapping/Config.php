@@ -13,13 +13,25 @@ use swiftphp\core\io\Path;
  *
  * @author Tomix
  */
-abstract class Config implements IConfigurable
+abstract class Config implements IConfig, IConfigurable
 {
     /**
      * ORM配置文件
      * @var string
      */
     protected $m_mapping_file;
+
+    /**
+     * 数据库实例
+     * @var IDatabase
+     */
+    protected $m_database;
+
+    /**
+     * 配置实例
+     * @var IConfiguration
+     */
+    protected $m_config=null;
 
     /**
      * 是否启用缓存
@@ -35,12 +47,6 @@ abstract class Config implements IConfigurable
     protected $m_debug = false;
 
     /**
-     * 应用根目录
-     * @var string
-     */
-    protected $m_baseDir="";
-
-    /**
      * 缓存管理器
      * @var ICacher
      */
@@ -53,22 +59,37 @@ abstract class Config implements IConfigurable
     protected $m_logger = null;
 
     /**
-     * 配置实例
-     * @var IConfiguration
-     */
-    protected $m_config=null;
-
-    /**
-     * 数据库实例
-     * @var IDatabase
-     */
-    protected $m_database;
-
-    /**
      * ORM映射表集
      * @var array
      */
     protected $m_tables = [];
+
+    /**
+     * 设置ORM配置文件(相对于应用根目录)
+     * @param string $value
+     */
+    public function setMappingFile($value)
+    {
+        $this->m_mapping_file = $value;
+    }
+
+    /**
+     * 设置数据库实例
+     * @param IDatabase $value
+     */
+    public function setDatabase(IDatabase$value)
+    {
+        $this->m_database = $value;
+    }
+
+    /**
+     * 设置配置实例
+     * @param IConfiguration $value
+     */
+    public function setConfiguration(IConfiguration $value)
+    {
+        $this->m_config=$value;
+    }
 
     /**
      * 是否调试状态
@@ -77,15 +98,6 @@ abstract class Config implements IConfigurable
     public function setDebug($value)
     {
         $this->m_debug = $value;
-    }
-
-    /**
-     * 设置应用根目录
-     * @param string $value
-     */
-    public function setBaseDir($value)
-    {
-        $this->m_baseDir=$value;
     }
 
     /**
@@ -107,33 +119,6 @@ abstract class Config implements IConfigurable
     }
 
     /**
-     * 注入配置实例
-     * @param IConfiguration $value
-     */
-    public function setConfiguration(IConfiguration $value)
-    {
-        $this->m_config=$value;
-    }
-
-    /**
-     * ORM配置文件
-     * @param string $value
-     */
-    public function setMappingFile($value)
-    {
-        $this->m_mapping_file = $value;
-    }
-
-    /**
-     * 数据库实例
-     * @param IDatabase $value
-     */
-    public function setDatabase(IDatabase$value)
-    {
-        $this->m_database = $value;
-    }
-
-    /**
      * 日志管理器
      * @param ILogger $value
      */
@@ -144,17 +129,46 @@ abstract class Config implements IConfigurable
 
     /**
      * 获取ORM映射的所有表名
-     * @return array
+     * @return Table[]
      */
     public function getTables()
     {
+        $this->load();
         return $this->m_tables;
     }
 
     /**
+     *
+     * @param string|object $class
+     * @return Table
+     */
+    public function getTable($class)
+    {
+        $this->load();
+        if (is_object($class))
+            $class = get_class($class);
+        if (array_key_exists($class, $this->m_tables))
+            return $this->m_tables[$class];
+        return null;
+    }
+
+    /**
+     * 映射数据库字段抽象方法,由具体数据库配置实例实现
+     * @param Table $table
+     */
+    public abstract function mappingColumns(Table &$table);
+
+    /**
+     * 映射数据库字段类型
+     * @param string $sqlType 数据库字段类型
+     * @return string
+     */
+    protected abstract function mappingType($sqlType);
+
+    /**
      * 加载配置
      */
-    public function load()
+    protected function load()
     {
         if (empty($this->m_tables)) {
             if ($this->m_cacheable && ! empty($this->m_cacher)) {
@@ -173,33 +187,6 @@ abstract class Config implements IConfigurable
     }
 
     /**
-     *
-     * @param string|object $class
-     * @return Table
-     */
-    public function getTable($class)
-    {
-        if (is_object($class))
-            $class = get_class($class);
-        if (array_key_exists($class, $this->m_tables))
-            return $this->m_tables[$class];
-        return null;
-    }
-
-    /**
-     * 映射数据库字段抽象方法,由具体数据库配置实例实现
-     * @param Table $table
-     */
-    public abstract function mappingColumns(&$table);
-
-    /**
-     * 映射数据库字段类型
-     * @param string $sqlType 数据库字段类型
-     * @return string
-     */
-    public abstract function mappingType($sqlType);
-
-    /**
      * ORM映射
      * @return \swiftphp\core\data\orm\mapping\Table[]
      */
@@ -207,9 +194,7 @@ abstract class Config implements IConfigurable
     {
         //mapping file
         $mappingFile=$this->m_mapping_file;
-        if(!empty($this->m_baseDir)){
-            $mappingFile=Path::combinePath($this->m_baseDir, $mappingFile);
-        }else if(!empty($this->m_config)){
+        if(!empty($this->m_config)){
             $mappingFile=Path::combinePath($this->m_config->getBaseDir(), $mappingFile);
         }
 
@@ -247,7 +232,7 @@ abstract class Config implements IConfigurable
             $this->mappingDeleteJoins($table, $obj);
 
             // mapping one to many
-            $this->mappingOneToManyJoins($table, $class, $obj);
+            $this->mappingOneToManyJoins($table, $class, $namespace, $obj);
 
             // mapping one to many
             $this->mappingManyToOneJoins($table, $class,$namespace, $obj);
@@ -318,7 +303,7 @@ abstract class Config implements IConfigurable
      * @param string $xml
      * @return void
      */
-    protected function mappingOneToManyJoins($table, $class, $xml)
+    protected function mappingOneToManyJoins($table, $class,$namespace, $xml)
     {
         $objs = $xml->getElementsByTagName("one-to-many");
         if ($objs->length > 0) {
@@ -337,6 +322,11 @@ abstract class Config implements IConfigurable
                             $alias=array_values($joins)[0]->getAlias();
                         }
                     }
+
+                    //多方的类型名,用于同步加载数据时实例化
+                    $_class=$obj->getAttribute("class");
+                    $_class = trim($namespace, "\\") . "\\" . trim($_class, "\\");
+                    $many->setClass($_class);
 
                     //查询列,同步与排序
                     $sync = $obj->getAttribute("sync"); // 该标签放在主关联表表示同步insert,update

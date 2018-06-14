@@ -2,11 +2,10 @@
 namespace swiftphp\core\utils;
 
 use swiftphp\core\system\ILogger;
-use swiftphp\core\config\IConfigurable;
 use swiftphp\core\config\IConfiguration;
 use swiftphp\core\io\Path;
-use swiftphp\core\BuiltInConst;
 use swiftphp\core\io\File;
+use swiftphp\core\config\IConfigurable;
 
 /**
  * 文件日志记录
@@ -22,12 +21,48 @@ class FileLogger implements ILogger,IConfigurable
     private $m_config=null;
 
     /**
+     * 日志记录位置
+     * @var string
+     */
+    private $m_logDir;
+
+    /**
      * 注入配置实例
      * @param IConfiguration $value
      */
     public function setConfiguration(IConfiguration $value)
     {
         $this->m_config=$value;
+    }
+
+    /**
+     * 获取日志记录位置(绝对目录)
+     * @return string
+     */
+    public function getLogDir()
+    {
+        $dir=__DIR__."/../../../../../_logs";
+        if(!empty($this->m_config)){
+            $dir=$this->m_config->getBaseDir();
+            if(!empty($this->m_logDir)){
+                $dir=Path::combinePath($dir, $this->m_logDir);
+            }else{
+                $dir=Path::combinePath($dir, "_logs");
+            }
+        }
+        if(!file_exists($dir)){
+            File::createDir($dir);
+        }
+        return $dir;
+    }
+
+    /**
+     * 设置日志记录位置(相对应用根目录)
+     * @param string $value
+     */
+    public function setLogDir($value)
+    {
+        $this->m_logDir=$value;
     }
 
 
@@ -63,29 +98,7 @@ class FileLogger implements ILogger,IConfigurable
      */
     public function logException(\Exception $ex,$prefix="ex")
     {
-        $this->log($ex->getCode().":".$ex->getMessage()+"\r\n"+$ex->getTraceAsString(),get_class($ex),$prefix);
-    }
-
-    /**
-     * 缓存目录
-     * @return string
-     */
-    private function getLogDir()
-    {
-        $dir=__DIR__."/../../_logs/";
-        if(!empty($this->m_config)){
-            $dir=$this->m_config->getBaseDir();
-            $_dir=$this->m_config->getConfigValue(BuiltInConst::$globalConfigSection, "logDir");
-            if(!empty($_dir)){
-                $dir=Path::combinePath($dir,$_dir);
-            }else{
-                $dir=Path::combinePath($dir, "_logs/");
-            }
-        }
-        if(!file_exists($dir)){
-            File::createDir($dir);
-        }
-        return $dir;
+        $this->log($ex->getCode().":".$ex->getMessage()."\r\n".$ex->getTraceAsString(),get_class($ex),$prefix);
     }
 }
 

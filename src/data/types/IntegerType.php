@@ -12,6 +12,6 @@ class IntegerType extends Type
      * 类型名称
      * @var string
      */
-    private $m_type=Type::INTEGER;
+    private $m_typeName=Type::INTEGER;
 }
 

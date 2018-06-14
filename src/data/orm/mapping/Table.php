@@ -138,7 +138,7 @@ class Table
 
     /**
      * 数据列集；键为列名，值为列模型
-     * @return array
+     * @return Column[]
      */
     public function getColumns()
     {
@@ -235,7 +235,7 @@ class Table
 
     /**
      * 一对多集合关联查询模型集.键为实体集合字段名，值为模型实例
-     * @return array
+     * @return OneToManyJoin[]
      */
     public function getOneToManyJoins()
     {
@@ -284,10 +284,9 @@ class Table
         }
     }
 
-
     /**
      * 多对一关联查询模型集.键为实体集合字段名，值为模型实例
-     * @return array
+     * @return ManyToOneJoin[]
      */
     public function getManyToOneJoins()
     {
@@ -338,7 +337,7 @@ class Table
 
     /**
      * 关联删除模型集
-     * @return array
+     * @return DeleteJoin[]
      */
     public function getDeleteJoins()
     {

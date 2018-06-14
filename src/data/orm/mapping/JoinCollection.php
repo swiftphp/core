@@ -17,7 +17,7 @@ class JoinCollection
 
     /**
      * 关联集
-     * @return array
+     * @return Join[]
      */
     public function getJoins()
     {

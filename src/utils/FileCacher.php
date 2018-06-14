@@ -46,6 +46,27 @@ class FileCacher implements ICacher,IConfigurable
     }
 
     /**
+     * 缓存目录
+     * @return string
+     */
+    public function getCacheDir()
+    {
+        $dir=__DIR__."/../../../../../_cache";
+        if(!empty($this->m_config)){
+            $dir=$this->m_config->getBaseDir();
+            if(!empty($this->m_cacheDir)){
+                $dir=Path::combinePath($dir, $this->m_cacheDir);
+            }else{
+                $dir=Path::combinePath($dir, "_cache");
+            }
+        }
+        if(!file_exists($dir)){
+            File::createDir($dir);
+        }
+        return rtrim($dir,"/")."/";
+    }
+
+    /**
      * 读取缓存
      * {@inheritDoc}
      * @see \swiftphp\core\system\ICacher::get()
@@ -111,28 +132,6 @@ class FileCacher implements ICacher,IConfigurable
         if(file_exists($file))
             return filemtime($file);
             return null;
-    }
-
-    /**
-     * 缓存目录
-     * @return string
-     */
-    private function getCacheDir()
-    {
-        $baseDir=$this->m_config->getBaseDir();
-        $dir="";
-        if(!empty($this->m_cacheDir)){
-            $dir=Path::combinePath($baseDir, $this->m_cacheDir);
-        }else{
-            $dir=Path::combinePath($baseDir, "_cache/app/");
-        }
-        if(!file_exists($dir)){
-            File::createDir($dir);
-        }
-        if(strrpos($dir, "/")!==strlen($dir)-1){
-            $dir.="/";
-        }
-        return $dir;
     }
 }
 

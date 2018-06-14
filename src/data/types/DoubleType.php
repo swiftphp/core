@@ -12,6 +12,6 @@ class DoubleType extends Type
      * 类型名称
      * @var string
      */
-    private $m_type=Type::DOUBLE;
+    private $m_typeName=Type::DOUBLE;
 }
 
