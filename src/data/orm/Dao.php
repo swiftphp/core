@@ -1087,8 +1087,6 @@ class Dao implements IDao, IConfigurable
             $sql .= " WHERE ".$filter;
         }
         $sql=$this->mapSqlExpression($modelClass,$sql,true);
-        echo $sql;
-        exit;
         return $this->getDatabase()->scalar($sql,$params);
     }
 
