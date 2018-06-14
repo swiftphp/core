@@ -1440,6 +1440,9 @@ class Dao implements IDao, IConfigurable
             //一方的表对象(一方类型必须经过映射配置)
             $oneClass=$many2one->getClass();
             $oneTable=$this->getOrmConfig()->getTable($oneClass);
+            if(empty($oneClass)||empty($oneTable)){
+                continue;
+            }
             $oneTableName=$oneTable->getName();
             //$oneAlias=$oneTable->getAlias();//此别名为原始配置的别名,不是多对一中配置的别名,此写法不可用
 
