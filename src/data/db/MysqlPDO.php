@@ -279,7 +279,7 @@ class MysqlPDO implements IDatabase
     private function pdoExecute($sql,array $params=[])
     {
         if($this->m_debug){
-            Console::printLine($sql);
+            Console::printLine($sql."\r\n");
         }
         $this->autoConnect();
         try{

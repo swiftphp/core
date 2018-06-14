@@ -966,7 +966,7 @@ class Dao implements IDao, IConfigurable
         }
 
         //查询
-        $sql=$this->mapSqlExpression($modelClass, $sql);
+        $sql=$this->mapSqlExpression($modelClass, $sql,true);
         $rs = $this->getDatabase()->query($sql,$params, $offset, $length);
 
 //         var_dump($rs);
@@ -1235,7 +1235,7 @@ class Dao implements IDao, IConfigurable
             if($autoAppendAlias){
                 $replace=(empty($alias)?$tbl:$alias).".".$dbField;
             }
-            $pattern="/([^\w]{1,1})".$field."/";
+            $pattern="/([^\w\.]{1,1})".$field."/";
             $matches=[];
             preg_match_all($pattern, $expression,$matches);
             if(count($matches[0])>0){
