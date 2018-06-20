@@ -264,5 +264,82 @@ class Convert
             return true;
         }
     }
+
+    /**
+     * 深度复制数组到对象属性
+     * @param array $array      数组
+     * @param object $obj       根对象
+     * @param array $classMap   对象类名映射;键对应的数组索引序列化为对象,多层用.号分隔;值第一个元素为类型名,第二个元素指定是否为对象数组
+     * @param bool $fieldAccess 是否通过公开字段赋值
+     */
+    public static function arrayToObjectDeeply($array,$obj,$classMap=[],$fieldAccess=true)
+    {
+        return self::_arrayToObjectDeeply($array, $obj,$classMap,$fieldAccess,"");
+    }
+
+    /**
+     * 深度复制数组到对象属性
+     * @param array $array      数组
+     * @param object $obj       根对象
+     * @param array $classMap   对象类名映射;键对应的数组索引序列化为对象,多层用.号分隔;值第一个元素为类型名,第二个元素指定是否为对象数组
+     * @param bool $fieldAccess 是否通过公开字段赋值
+     * @param string $currentPrefix 当前索引的前缀
+     */
+    private static function _arrayToObjectDeeply($array,$obj,$classMap=[],$fieldAccess=true,$currentPrefix="")
+    {
+        $prefix=$currentPrefix;
+        if(!empty($prefix)){
+            $prefix.=".";
+        }
+        if(is_array($array) && is_object($obj)){
+            $props=[];
+            if($fieldAccess){
+                $props=array_keys(get_object_vars($obj));
+            }
+            foreach ($array as $name => $value){
+                $key=$prefix.$name;
+                if(array_key_exists($key, $classMap)){
+                    if(is_array($value)){
+                        $map=$classMap[$key];
+                        $class=$map[0];
+                        $isArray=$map[1];
+
+                        if($isArray && is_array($value)){
+                            $objArray=[];
+                            foreach ($value as $_name => $_value){
+                                $_obj=new $class();
+                                self::_arrayToObjectDeeply($_value, $_obj,$classMap,$fieldAccess,$key);
+                                $objArray[$_name]=$_obj;
+                            }
+                            self::_setProperty($obj, $name, $objArray,$props);
+                        }else{
+                            $_obj=new $class();
+                            self::_arrayToObjectDeeply($value, $_obj,$classMap,$fieldAccess,$key);
+                            self::_setProperty($obj, $name, $_obj,$props);
+                        }
+                    }
+                }else{
+                    self::_setProperty($obj, $name, $value,$props);
+                }
+            }
+        }
+    }
+
+    /**
+     * 设置对象属性值
+     * @param object $obj
+     * @param string $name
+     * @param mixed $value
+     * @param array $publicFields 通过公开的字段赋值时,提供对象的公开字段名
+     */
+    private static function _setProperty($obj,$name,$value,$publicFields=[])
+    {
+        $setter="set".ucfirst($name);
+        if(method_exists($obj, $setter)){
+            $obj->$setter($value);
+        }else if(in_array($name, $publicFields)){
+            $obj->$name=$value;
+        }
+    }
 }
 
