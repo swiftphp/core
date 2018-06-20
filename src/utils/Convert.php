@@ -330,7 +330,7 @@ class Convert
      * @param object $obj
      * @param string $name
      * @param mixed $value
-     * @param array $publicFields 通过公开的字段赋值时,提供对象的公开字段名
+     * @param array $publicFields 允许通过公开的字段赋值时,提供对象的公开字段名
      */
     private static function _setProperty($obj,$name,$value,$publicFields=[])
     {
