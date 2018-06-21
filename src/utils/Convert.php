@@ -225,6 +225,7 @@ class Convert
      * @param object $srcObject 	源对象
      * @param object $destObject	引用传递:目标对象
      * @return boolean
+     * @deprecated
      */
     public static function copyPropertyValues($srcObject,$destObject,$fieldMap=[])
     {
