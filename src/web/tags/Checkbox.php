@@ -2,6 +2,8 @@
 namespace swiftphp\core\web\tags;
 
 
+use swiftphp\core\utils\ObjectUtil;
+
 /**
  * 复选框列表标签
  * @author Tomix
@@ -120,22 +122,26 @@ class Checkbox extends TagBase
 	 */
 	private function bindData()
 	{
-		$this->items=[];
-		if(is_array($this->dataSource[0])){
-			foreach($this->dataSource as $row){
-				$item=[];
-				$item["value"]=$row[$this->valueField];
-				$item["text"]=$row[$this->textField];
-				$this->items[]=$item;
-			}
-		}else{
-			foreach(array_keys($this->dataSource) as $key){
-				$item=[];
-				$item["value"]=$key;
-				$item["text"]=$this->dataSource[$key];
-				$this->items[]=$item;
-			}
-		}
+	    if(is_array($this->dataSource) && count($this->dataSource)>0){
+	        $this->items=[];
+	        if(count($this->dataSource)==count($this->dataSource,COUNT_RECURSIVE)){
+	            //键值对数组或对象数组
+	            foreach ($this->dataSource as $key => $value){
+	                if(is_object($value)){
+	                    $_value=ObjectUtil::getPropertyValue($value, $this->valueField,true);
+	                    $_text=ObjectUtil::getPropertyValue($value, $this->textField,true);
+	                    $this->items[]=["value"=>$_value,"text"=>$_text];
+	                }else{
+	                    $this->items[]=["value"=>$key,"text"=>$value];
+	                }
+	            }
+	        }else{
+	            //二维数组
+	            foreach($this->dataSource as $row){
+	                $this->items[]=["value"=>$row[$this->valueField],"text"=>$row[$this->textField]];
+	            }
+	        }
+	    }
 	}
 
 
