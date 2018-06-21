@@ -96,5 +96,32 @@ class ObjectUtil
     {
         return self::hasGetter($class, $propertyName)&&self::hasSetter($class, $propertyName);
     }
+
+    /**
+     * 复制对象属性
+     * @param object $srcObject    源对象
+     * @param object $destObject   目标对象
+     * @param array $fieldMap      字段映射
+     * @param string $fieldAccess  是否允许直接访问公开字段
+     * @return boolean
+     */
+    public static function copyPropertyValues($srcObject,$destObject,$fieldMap=[],$fieldAccess=false)
+    {
+        if(!is_object($srcObject)||!is_object($destObject)){
+            return false;
+        }
+        $destFields=[];
+        if($fieldAccess){
+            $destFields=array_keys(get_object_vars($destObject));
+        }
+        foreach (get_object_vars($srcObject) as $prop=>$value){
+            $destProp=array_key_exists($prop, $fieldMap)?$fieldMap[$prop]:$prop;
+            if(self::hasSetter($destObject, $destProp)){
+                self::setPropertyValue($destObject, $destProp, $value);
+            }else if(in_array($destProp, $destFields)){
+                $destObject->$destProp=$value;
+            }
+        }
+    }
 }
 
