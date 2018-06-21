@@ -9,35 +9,6 @@ namespace swiftphp\core\utils;
 class ObjectUtil
 {
     /**
-     * 设置对象属性
-     * @param object $obj           对象
-     * @param string $propertyName  属性名
-     * @param mixed $value          属性值
-     * @return void
-     */
-    public static function setPropertyValue($obj,$propertyName,$value)
-    {
-        $setter = "set" . ucfirst($propertyName);
-        if (method_exists($obj, $setter)) {
-            $obj->$setter($value);
-        }
-    }
-
-    /**
-     * 获取对象属性值
-     * @param object $obj           对象
-     * @param string $propertyName  属性名
-     * @return mixed
-     */
-    public static function getPropertyValue($obj,$propertyName)
-    {
-        $getter = "get" . ucfirst($propertyName);
-        if (method_exists($obj, $getter)) {
-            return $obj->$getter();
-        }
-    }
-
-    /**
      * 根据属性名获取getter方法名
      * @param object|string $class  对象或类型名
      * @param string $propertyName  属性名
@@ -95,6 +66,41 @@ class ObjectUtil
     public static function hasGetterAndSetter($class,$propertyName)
     {
         return self::hasGetter($class, $propertyName)&&self::hasSetter($class, $propertyName);
+    }
+
+    /**
+     * 设置对象属性
+     * @param object $obj           对象
+     * @param string $propertyName  属性名
+     * @param mixed $value          属性值
+     * @param bool $fieldAccess     setter不存在时,是否允许通过公开的字段访问
+     * @return void
+     */
+    public static function setPropertyValue($obj,$propertyName,$value,$fieldAccess=false)
+    {
+        $setter=self::getSetter($obj, $propertyName);
+        if(!empty($setter)){
+            $obj->$setter($value);
+        }else if($fieldAccess && array_key_exists($propertyName, get_object_vars($obj))){
+            $obj->$propertyName=$value;
+        }
+    }
+
+    /**
+     * 获取对象属性值
+     * @param object $obj           对象
+     * @param string $propertyName  属性名
+     * @param bool $fieldAccess     getter不存在时,是否允许通过公开的字段访问
+     * @return mixed
+     */
+    public static function getPropertyValue($obj,$propertyName,$fieldAccess=false)
+    {
+        $getter=self::getGetter($obj, $propertyName);
+        if(!empty($getter)){
+            return $obj->$getter();
+        }else if($fieldAccess && array_key_exists($propertyName, get_object_vars($obj))){
+            return $obj->$propertyName;
+        }
     }
 
     /**
