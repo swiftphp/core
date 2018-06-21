@@ -74,6 +74,30 @@ abstract class Config implements IConfig, IConfigurable
     }
 
     /**
+     * 获取ORM配置文件(相对于应用根目录)
+     * @return string
+     */
+    public function getMappingFile()
+    {
+        return $this->m_mapping_file;
+    }
+
+    /**
+     * 获取ORM配置文件(绝对位置)
+     * @return string
+     */
+    public function getMappingAbsoluteFile()
+    {
+        //mapping file
+        $mappingFile=$this->m_mapping_file;
+        if(!empty($this->m_config)){
+            $mappingFile=Path::combinePath($this->m_config->getBaseDir(), $mappingFile);
+        }
+        return $mappingFile;
+    }
+
+
+    /**
      * 设置数据库实例
      * @param IDatabase $value
      */
@@ -172,9 +196,10 @@ abstract class Config implements IConfig, IConfigurable
     {
         if (empty($this->m_tables)) {
             if ($this->m_cacheable && ! empty($this->m_cacher)) {
-                $cacheKey = md5($this->m_mapping_file);
+                $mappingFile=$this->getMappingAbsoluteFile();
+                $cacheKey = md5($mappingFile);
                 $cache = $this->m_cacher->get($cacheKey);
-                if (empty($cache) || (file_exists($this->m_mapping_file) &&  filemtime($this->m_mapping_file) > $this->m_cacher->getCacheTime($cacheKey))) {
+                if (empty($cache) || (file_exists($mappingFile) &&  filemtime($mappingFile) > $this->m_cacher->getCacheTime($cacheKey))) {
                     $this->m_tables = $this->loadMapping();
                     $this->m_cacher->set($cacheKey, $this->m_tables);
                 } else {
@@ -193,10 +218,7 @@ abstract class Config implements IConfig, IConfigurable
     protected function loadMapping()
     {
         //mapping file
-        $mappingFile=$this->m_mapping_file;
-        if(!empty($this->m_config)){
-            $mappingFile=Path::combinePath($this->m_config->getBaseDir(), $mappingFile);
-        }
+        $mappingFile=$this->getMappingAbsoluteFile();
 
         // load from xml file
         $xmlDoc = new \DOMDocument();
