@@ -20,8 +20,11 @@ class DateTime
      */
     public function __construct($time="")
     {
-        if(empty($time)){
+        if($time==""){
             $time=time();
+        }
+        if(strlen($time)>10){
+            $time=substr($time, 0,10);
         }
         $this->_time=$time;
     }
