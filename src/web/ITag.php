@@ -8,10 +8,12 @@ namespace swiftphp\core\web;
  */
 interface ITag
 {
+
     /**
      * 获取标签渲染后的内容
+     * @param array $outputParams 输出参数,用于子标签的呈现
      */
-    function getContent();
+    function getContent(&$outputParams=[]);
 
     /**
      * 设置标签内部html
