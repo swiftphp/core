@@ -63,9 +63,8 @@ class Iterator extends TagBase
         $builder=$this->buildTemplate($this->getInnerHtml(),$outputParams);
 
         //清空多余的占位
-//         $pattern="/#\{[\w\.]+\}/isU";
-//         $builder=preg_replace($pattern, "", $builder);
-
+        $pattern="/#\{[\w\.]+\}/isU";
+        $builder=preg_replace($pattern, "", $builder);
         return $builder;
     }
 
@@ -115,65 +114,6 @@ class Iterator extends TagBase
     }
 
     /**
-     * 替换模板内容
-     * @param array $data
-     * @param string $template
-     * @param array $parentRow
-     * @param number $level
-     * @return string
-     */
-    protected function ___buildTemplate($data,$template,$parentRow=null,$level=0)
-    {
-        $builder="";
-        for($i=0;$i<count($data);$i++){
-            $_template=$template;
-
-            //状态信息行
-            if(!empty($this->status)){
-                $arr=["index"=>(string)$i
-                    ,"count"=>(string)($i+1)
-                    ,"first"=>($i==0)?"true":"false"
-                    ,"odd"=>($i/2==0)?"true":"false"
-                    ,"last"=>($i==count($data)-1)?"true":"false"];
-                $statusTemplate="#".$this->status;
-                foreach ($arr as $k=>$v){
-                    $_template=str_replace($statusTemplate.".".$k, $v, $_template);
-                }
-            }
-
-            //匹配上级字段#{_parent.[key]}
-            if($parentRow!=null && is_array($parentRow))
-            {
-                foreach ($parentRow as $field=>$value){
-                    $_template=preg_replace("/#{[\s]{0,}_parent.".$field."[\s]{0,}}/",$value,$_template);
-                }
-            }
-
-            //当前行
-            $row=$data[$i];
-            if(is_object($row)){
-                $row=get_object_vars($row);
-            }
-            if(is_array($row)){
-                foreach ($row as $field=>$value){
-                    if(!is_array($value) && !is_object($value)){
-                        $value=str_replace("$", "\\\$", $value);//保护全局表达式
-                        $_template=preg_replace("/#{[\s]{0,}".$field."[\s]{0,}}/",$value,$_template);
-                    }else if(is_array($value)){
-                        $_template=$this->addArrayParams($_template, $value, $field);
-                    }else if(is_object($value)){
-                        $value=get_object_vars($value);
-                        $_template=$this->addArrayParams($_template, $value,$field);
-                    }
-                }
-            }
-            //$_template=preg_replace("/#{([0-9a-zA-Z_ ]{0,})}/","",$_template);
-            $builder .= trim($_template);
-        }
-        return $builder;
-    }
-
-    /**
      * 取得子模板内容
      * 子模板没有隔行模板标签,所以只有一个模板行
      */
@@ -188,7 +128,6 @@ class Iterator extends TagBase
             return ["outerHtml"=>$match[0],"parent"=>$match[1],"innerHtml"=>$match[2]];
         }
         return null;
-
     }
 
 
