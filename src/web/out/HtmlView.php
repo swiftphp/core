@@ -130,7 +130,7 @@ class HtmlView extends View implements IOutput
      * 替换标签内容
      * @param string $view
      */
-    protected function loadTags($view)
+    protected function loadTags($view,&$outputParams=[])
     {
         //$start="/<".$this->m_tagPlaceHolder." _tag=\"([a-zA-Z]{1,}[\w-]*):([a-zA-Z]{1,}[\w]*)\"/";
         $start="<".$this->m_tagPlaceHolder." ";
@@ -159,19 +159,20 @@ class HtmlView extends View implements IOutput
         $outerHtml=substr($view, $startPos,$endPos-$startPos+strlen($end));
 
         //标签内容替换
-        $tagHtml=$this->getTagContent($outerHtml);
+        $tagHtml=$this->getTagContent($outerHtml,$outputParams);
         $view=str_replace($outerHtml, $tagHtml, $view);
 
         //返回清除标签后的内容,递归处理子标签
-        return $this->loadTags($view);
+        return $this->loadTags($view,$outputParams);
     }
 
     /**
      * 获取标签内容
      * @param string $tagOuterHtml
+     * @param array $outputParams
      * @throws \Exception
      */
-    protected function getTagContent($tagOuterHtml)
+    protected function getTagContent($tagOuterHtml,&$outputParams=[])
     {
         $attributes=HtmlHelper::getTagAttributes($tagOuterHtml);
         $innerHtml=HtmlHelper::getTagInnerHtml($tagOuterHtml, $this->m_tagPlaceHolder);
@@ -207,7 +208,11 @@ class HtmlView extends View implements IOutput
                 $keys=$matches[1];
                 for($i=0;$i<count($keys);$i++){
                     $key=$keys[$i];
-                    $_value=$this->getUIParams($this->m_tagParams,$key);
+                    //$_value=$this->getUIParams($this->m_tagParams,$key);
+                    $_value=HtmlHelper::getUIParams($outputParams, $key);//先从递归的参数取值
+                    if(!$_value){
+                        $_value=HtmlHelper::getUIParams($this->m_tagParams, $key);//从全局参数取值
+                    }
                     if(!is_array($_value) && !is_object($_value)){
                         $holder=$holders[$i];
                         $value=str_replace($holder, $_value, $value);
@@ -226,7 +231,7 @@ class HtmlView extends View implements IOutput
                 $obj->addAttribute($name, $value);
             }
         }
-        return $obj->getContent();
+        return $obj->getContent($outputParams);
     }
 
     /**

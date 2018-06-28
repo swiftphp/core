@@ -3,6 +3,12 @@ namespace swiftphp\core\web\tags;
 
 use swiftphp\core\web\HtmlHelper;
 
+/**
+ * 遍历数据集合标签
+ * @author Tomix
+ * @deprecated 使用Iterator代替
+ *
+ */
 class Repeater extends TagBase
 {
 	/**
