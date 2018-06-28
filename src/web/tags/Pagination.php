@@ -156,7 +156,7 @@ class Pagination extends TagBase
         $this->currentClass = $value;
     }
 
-    public function getContent()
+    public function getContent(&$outputParams=[])
     {
         //echo $this->formatHref;
         //exit;

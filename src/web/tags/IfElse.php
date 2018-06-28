@@ -28,7 +28,7 @@ class IfElse extends TagBase
      * {@inheritDoc}
      * @see \swiftphp\core\web\tags\TagBase::getContent()
      */
-    public function getContent()
+    public function getContent(&$outputParams=[])
     {
         $elseHtml="";
         $elseTemp="";

@@ -26,7 +26,7 @@ class EvalValue extends TagBase
     /**
      * 获取标签渲染后的内容
      */
-    public function getContent()
+    public function getContent(&$outputParams=[])
     {
         if(empty($this->m_exp)){
             return "";

@@ -13,7 +13,7 @@ class Link extends TagBase
      * {@inheritDoc}
      * @see \swiftphp\core\web\tags\TagBase::getContent()
      */
-    public function getContent()
+    public function getContent(&$outputParams=[])
     {
         $str="<a";
         foreach ($this->getAttributes() as $key => $val){

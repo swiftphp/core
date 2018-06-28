@@ -76,7 +76,7 @@ class Radio extends TagBase
      * @see lib/beans/bean#getContent()
      * @return string
      */
-    public function getContent()
+    public function getContent(&$outputParams=[])
     {
         if(!empty($this->dataSource)){
             $this->bindData();

@@ -84,7 +84,7 @@ class Checkbox extends TagBase
 	 * {@inheritDoc}
 	 * @see \swiftphp\core\web\tags\TagBase::getContent()
 	 */
-	public function getContent()
+    public function getContent(&$outputParams=[])
 	{
 	    if(is_array($this->dataSource) && count($this->dataSource)>0){
 	        $this->bindData();

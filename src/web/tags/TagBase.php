@@ -42,8 +42,9 @@ abstract class TagBase implements ITag
 
     /**
      * 获取标签渲染后的内容
+     * @param array $outputParams 迭代输出参数,用于子标签的呈现
      */
-    public abstract function getContent();
+    public abstract function getContent(&$outputParams=[]);
 
     /**
      * 设置标签内部html

@@ -93,7 +93,7 @@ class Select extends TagBase
 	 * @see lib/beans/bean#getContent()
 	 * @return string
 	 */
-	public function getContent()
+	public function getContent(&$outputParams=[])
 	{
 		if(is_array($this->dataSource) && count($this->dataSource)>0){
 			$this->bindData();

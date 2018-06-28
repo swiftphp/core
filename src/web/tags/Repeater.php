@@ -62,7 +62,7 @@ class Repeater extends TagBase
 	 * 获取标签渲染后的内容
 	 * @return string
 	 */
-	public function getContent()
+    public function getContent(&$outputParams=[])
 	{
 		if(!is_array($this->dataSource)){
 			return "";

@@ -71,7 +71,7 @@ class NumberFormat extends TagBase
     /**
      * 获取标签渲染后的内容
      */
-    public function getContent()
+    public function getContent(&$outputParams=[])
     {
         return number_format($this->m_value,$this->m_decimals,$this->m_decimalpoint,$this->m_separator);
     }
