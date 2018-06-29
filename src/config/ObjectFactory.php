@@ -4,11 +4,11 @@ namespace swiftphp\core\config;
 use swiftphp\core\BuiltInConst;
 
 /**
- * 对象工厂
+ * 内置对象工厂
  * @author Tomix
  *
  */
-class ObjectFactory
+class ObjectFactory implements IObjectFactory,IConfigurable
 {
     /**
      * 配置实例
@@ -35,42 +35,26 @@ class ObjectFactory
     private $m_singletonObjMap=[];
 
     /**
-     * 静态实例
-     * @var array
+     * 注入配置实例
+     * @param IConfiguration $value
      */
-    private static $m_instanceMap=[];
-
-
-    /**
-     * 构造函数
-     * @param IConfiguration $config 配置实例
-     * @param string $configSection  对象配置节点
-     */
-    private function __construct(IConfiguration $config,$configSection="objects")
+    public function setConfiguration(IConfiguration $value)
     {
-        $this->m_config=$config;
-        $this->m_configSection=$configSection;
+        $this->m_config=$value;
     }
 
     /**
-     * 创建工厂实例
-     * @param IConfiguration $config 配置实例
-     * @param string $configSection  对象配置节点
-     * @return ObjectFactory
+     * 设置对象配置节点
+     * @param string $value
      */
-    public static function getInstance(IConfiguration $config,$configSection="objects")
+    public function setConfigSection($value)
     {
-        $configKey=$config->getConfigFile()."$".$configSection;
-        if(!array_key_exists($configKey, self::$m_instanceMap)){
-            self::$m_instanceMap[$configKey]=new ObjectFactory($config,$configSection);
-        }
-        return self::$m_instanceMap[$configKey];
+        $this->m_configSection=$value;
     }
 
     /**
-     * 根据对象ID或类型名创建对象(此种方式必须配置对象)
-     * 执行过程:创建对象,注入全局配置,注入当前配置,注入配置实例
-     * @param string $objectId 对象id(未配置id属性时,以类型名为id)
+     * 根据对象ID创建实例
+     * @param string $objectId  对象ID
      */
     public function create($objectId)
     {
@@ -82,7 +66,7 @@ class ObjectFactory
 
         //如果单例模式且对象已经存在,直接返回
         if($objInfo->singleton && array_key_exists($objectId, $this->m_singletonObjMap)){
-             return $this->m_singletonObjMap[$objectId];
+            return $this->m_singletonObjMap[$objectId];
         }
 
         //创建对象
@@ -113,13 +97,12 @@ class ObjectFactory
 
         //返回对象
         return $obj;
-
     }
 
     /**
-     * 根据类型名创建对象(若有配置,则从配置创建,否则直接创建)
-     * @param string $class         对象类型名
-     * @param $singleton            是否单例模式(如果有配置,则忽略此参数)
+     * 根据类型名创建实例
+     * @param string $class     类型名称
+     * @param bool $singleton   是否单例模式,默认为单例模式
      */
     public function createByClass($class,$singleton=true)
     {
@@ -267,6 +250,7 @@ class ObjectFactory
     }
 }
 
+
 /**
  * 对象配置信息
  * @author Tomix
@@ -298,3 +282,4 @@ class ObjectInfo
      */
     public $propertyInfos=[];
 }
+

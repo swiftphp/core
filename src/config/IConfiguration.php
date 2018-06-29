@@ -70,5 +70,11 @@ interface IConfiguration
      * @param string $value
      */
     function addConfigValue($section,$name,$value);
+
+    /**
+     * 获取对象工厂实例
+     * @return IObjectFactory
+     */
+    function getObjectFactory();
 }
 

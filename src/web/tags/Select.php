@@ -1,7 +1,6 @@
 <?php
 namespace swiftphp\core\web\tags;
 
-use swiftphp\core\utils\ObjectUtil;
 
 /**
  * 下拉框列表控件

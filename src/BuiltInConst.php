@@ -14,4 +14,10 @@ class BuiltInConst
      */
     public static $globalConfigSection="global";
 
+    /**
+     * 对象工厂配置节点名
+     * @var string
+     */
+    public static $objectFactoryConfigSection="objectFactory";
+
 }

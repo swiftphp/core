@@ -2,6 +2,7 @@
 namespace swiftphp\core\web\tags;
 
 use swiftphp\core\web\HtmlHelper;
+use swiftphp\core\utils\ObjectUtil;
 
 /**
  * 遍历数据集合标签
@@ -22,6 +23,30 @@ class Iterator extends TagBase
      * @var string
      */
     protected $status="status";
+
+    /**
+     * 是否显示树型数据
+     * @var boolean
+     */
+    protected $showTree="false";
+
+    /**
+     * 显示树型数据时,主键字段名
+     * @var string
+     */
+    protected $primaryKey;
+
+    /**
+     * 显示树型数据时,父数据字段名
+     * @var string
+     */
+    protected $parentKey;
+
+    /**
+     * 显示树型数据时,根字段值
+     * @var string
+     */
+    protected $rootKey="";
 
     /**
      * 设置数据源
@@ -51,6 +76,42 @@ class Iterator extends TagBase
     }
 
     /**
+     * 是否显示树型数据
+     * @param boolean $value
+     */
+    public function setShowTree($value)
+    {
+        $this->showTree=$value;
+    }
+
+    /**
+     * 显示树型数据时,主键字段名
+     * @param string $value
+     */
+    public function setPrimaryKey($value)
+    {
+        $this->primaryKey=$value;
+    }
+
+    /**
+     * 显示树型数据时,父数据字段名
+     * @param string $value
+     */
+    public function setParentKey($value)
+    {
+        $this->parentKey=$value;
+    }
+
+    /**
+     * 显示树型数据时,根字段值
+     * @param string $value
+     */
+    public function setRootKey($value)
+    {
+        $this->rootKey=$value;
+    }
+
+    /**
      * 获取标签渲染后的内容
      * @return string
      */
@@ -59,26 +120,139 @@ class Iterator extends TagBase
         if(!is_array($this->dataSource)){
             return "";
         }
-        //根据数据源替换变量
-        $builder=$this->buildTemplate($this->getInnerHtml(),$outputParams);
 
-        //清空多余的占位
+        //数据
+        $data=[];
+        $showTree=strtolower($this->showTree);
+        if($showTree=="true"||$showTree=="1"){
+            foreach ($this->dataSource as $dr){
+                if((is_object($dr) && ObjectUtil::getPropertyValue($dr, $this->parentKey)==$this->rootKey)
+                    ||(is_array($dr) && array_key_exists($this->parentKey, $dr) && $dr[$this->parentKey]==$this->rootKey)){
+                        $data[]=$dr;
+                }
+            }
+        }else{
+            $data=$this->dataSource;
+        }
+
+        //根据数据源替换变量
+        $builder=$this->buildTemplate($this->getInnerHtml(),$data,null,$outputParams);
+
+        //清空多余的#占位
         $pattern="/#\{[\w\.]+\}/isU";
         $builder=preg_replace($pattern, "", $builder);
         return $builder;
     }
 
-    private function buildTemplate($template,&$outParams=[])
+    /**
+     * 替换模板占位
+     * @param string $template
+     * @param array $data
+     * @param array|object $parentRow
+     * @param array $outParams
+     * @return string
+     */
+    private function buildTemplate($template,$data,$parentRow,&$outParams=[])
     {
+        if(empty($data)){
+            return "";
+        }
+
+        $child=$this->getChildTemplate($template);
+        $childAttr=[];
+        if($child){
+            $childAttr=HtmlHelper::getTagAttributes($child["outerHtml"]);
+        }
+
         //匹配参数
         $builder="";
-        foreach ($this->dataSource as $line){
+        for($i=0;$i<count($data);$i++){
+            $line=$data[$i];
             $_template=$template;
+
+            //树状下一级数据
+            if($child){
+                $childData=$this->getChildData($line, $childAttr);
+                $childTemplate=$this->buildTemplate($child["innerHtml"], $childData, $line,$outParams);
+                $_template=str_replace($child["outerHtml"], $childTemplate, $_template);
+            }
+
             $_template=$this->buildTemplateRow($_template, $line, "/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$outParams);
             $_template=$this->buildTemplateRow($_template, $line, "/#{[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$outParams);
+
+            //状态信息行
+            if(!empty($this->status)){
+                $arr=["index"=>(string)$i
+                    ,"count"=>(string)($i+1)
+                    ,"first"=>($i==0)?"true":"false"
+                    ,"odd"=>($i/2==0)?"true":"false"
+                    ,"last"=>($i==count($data)-1)?"true":"false"];
+                $pattern="/#".$this->status."\.(index|count|first|odd|last)/isU";
+                $matches=[];
+                if(preg_match_all($pattern, $_template,$matches,PREG_PATTERN_ORDER)){
+                    for($j=0;$j<count($matches[0]);$j++){
+                        $key=$matches[1][$j];
+                        $search=$matches[0][$j];
+                        if(array_key_exists($key, $arr)){
+                            $_template=str_replace($search, $arr[$key], $_template);
+                        }
+                    }
+                }
+            }
+
+            //匹配上级字段${parent.[key]}
+            if(!empty($parentRow)){
+                $pattern="/[#|\\\$]\{[\s]*parent\.([^\{\}]{1,})[\s]*\}/";
+                $matches=[];
+                if(preg_match_all($pattern, $_template,$matches,PREG_PATTERN_ORDER)){
+                    for($j=0;$j<count($matches[0]);$j++){
+                        $key=$matches[1][$j];
+                        $search=$matches[0][$j];
+                        $value=HtmlHelper::getUIParams($parentRow, $key);
+                        if($value){
+                            $_template=str_replace($search, $value, $_template);
+                        }
+                    }
+                }
+            }
+
             $builder.=$_template;
         }
         return $builder;
+    }
+
+    /**
+     *
+     * @param unknown $parentRow
+     * @param unknown $childAttr
+     * @return mixed|boolean|array|unknown[]
+     */
+    private function getChildData($parentRow,$childAttr)
+    {
+        $key=array_key_exists("data", $childAttr)?$childAttr["data"]:"";
+        if(empty($key)){
+            $key=array_key_exists("parent", $childAttr)?$childAttr["parent"]:"";
+        }
+        $key=str_replace("#{", "", $key);
+        $key=str_replace("\${", "", $key);
+        $key=str_replace("}", "", $key);
+        $key=trim($key);
+        $value=HtmlHelper::getUIParams($parentRow, $key);
+
+        if(array_key_exists("data", $childAttr)){
+            //直接从属性返回
+            return $value;
+        }else if(array_key_exists("parent", $childAttr)){
+            //从数据源搜索
+            $values=[];
+            foreach ($this->dataSource as $dr){
+                if((is_object($dr) && ObjectUtil::getPropertyValue($dr, $this->parentKey)==$key)
+                    ||(is_array($dr) && array_key_exists($this->parentKey, $dr) && $dr[$this->parentKey]==$value)){
+                        $values[]=$dr;
+                }
+            }
+            return $values;
+        }
     }
 
     /**
@@ -115,38 +289,18 @@ class Iterator extends TagBase
 
     /**
      * 取得子模板内容
-     * 子模板没有隔行模板标签,所以只有一个模板行
+     * <template parent="parent"></template>||<template data="parent"></template>
      */
-    protected function getTemplateChild($parentHtml)
+    protected function getChildTemplate($parentHtml)
     {
-        //返回值数组:0,parent属性;1,outerHtml,2,innerHtml
+        //返回值数组:parent,outerHtml,innerHtml,data
         $tagName="template";
-        $pattern="/<".$tagName."[^>]{1,}parent[\s]*=[\s]*[\"|\']([^\s]{1,})[\"|\'][^>]*>(.*)<\/".$tagName.">/is";//贪婪模式
         $matches=[];
-        if(preg_match_all($pattern,$parentHtml,$matches,PREG_SET_ORDER)>0){
-            $match=$matches[0];
-            return ["outerHtml"=>$match[0],"parent"=>$match[1],"innerHtml"=>$match[2]];
+        $pattern="/<".$tagName."[^>]+>(.*)<\/".$tagName.">/is";//贪婪模式
+        if(preg_match($pattern,$parentHtml,$matches)){
+            return ["outerHtml"=>$matches[0],"innerHtml"=>$matches[1]];
         }
-        return null;
+        return false;
     }
-
-
-    protected function addArrayParams($template,$array,$prefix="")
-    {
-        foreach ($array as $key=>$value){
-            $_prefix=$prefix.".".$key;
-            if(is_array($value)){
-                $template=$this->addArrayParams($template, $value,$_prefix);
-            }else if(is_object($value)){
-                $_value=get_object_vars($value);
-                $template=$this->addArrayParams($template, $_value,$_prefix);
-            }else{
-                $value=str_replace("$", "\\\$", $value);
-                $template=preg_replace("/#{[\s]{0,}".$prefix.".".(string)$key."[\s]{0,}}/",$value,$template);
-            }
-        }
-        return $template;
-    }
-
 }
 

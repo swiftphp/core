@@ -3,43 +3,19 @@ namespace swiftphp\core\http;
 
 use swiftphp\core\config\IConfiguration;
 use swiftphp\core\system\ILogger;
-use swiftphp\core\config\ConfigurationFactory;
 use swiftphp\core\BuiltInConst;
 use swiftphp\core\config\ObjectFactory;
 use swiftphp\core\io\Path;
+use swiftphp\core\system\IRunnable;
+use swiftphp\core\config\IConfigurable;
 
 /**
  * 主入口容器
  * @author Tomix
  *
  */
-class Container
+class Container implements IRunnable,IConfigurable
 {
-
-    /**
-     * 初始化参数配置键
-     * @var string
-     */
-    private static $PARAMS_CONFIG_KEY="params";
-
-    /**
-     * 过滤器配置键
-     * @var string
-     */
-    private static $FILTERS_CONFIG_KEY="filters";
-
-    /**
-     * 监听器配置键
-     * @var string
-     */
-    private static $LISTENERS_CONFIG_KEY="listeners";
-
-    /**
-     * 容器所在配置节
-     * @var string
-     */
-    private $m_configSection = "container";
-
     /**
      * 当前运行的配置实例
      * @var IConfiguration
@@ -54,13 +30,13 @@ class Container
 
     /**
      * 所有过滤器
-     * @var array
+     * @var IFilter[]
      */
     private $m_filters=[];
 
     /**
      * 所有监听器,原则上没有执行顺序
-     * @var array
+     * @var IListener[]
      */
     private $m_listeners=[];
 
@@ -81,6 +57,15 @@ class Container
      * @var string
      */
     private $m_errorTemplate="";
+
+    /**
+     * 注入配置实例
+     * @param IConfiguration $value
+     */
+    public function setConfiguration(IConfiguration $value)
+    {
+        $this->m_config=$value;
+    }
 
     /**
      * 是否为调试模式
@@ -110,45 +95,32 @@ class Container
     }
 
     /**
-     * 容器构造
-     * @param string $configFile    配置文件
-     * @param string $baseDir       应用根目录(默认为配置入口文件所在目录)
-     * @param string $userDir       用户根目录(默认与应用根目录相同)
-     * @param array $extConfigs     附加扩展的配置(section,name,value形式的数组,默认为空)
-     * @param string $configSection 容器配置节点(默认为:container)
+     * 注入过滤器列表
+     * @param IFilter[] $value
      */
-    public function __construct($configFile,$baseDir="",$userDir="",$extConfigs=[],$configSection="container")
+    public function setFilters(array $value)
     {
-        $this->m_config=ConfigurationFactory::create($configFile,$baseDir,$userDir,$extConfigs);
-        $this->m_configSection=$configSection;
+        $this->m_filters=$value;
     }
 
     /**
-     * 启动一个容器
-     * @param Container $instance
+     * 注入监听器列表
+     * @param IListener[] $value
      */
-    public static function run(Container $instance)
+    public function setListeners(array $value)
     {
-        $instance->execute();
+        $this->m_listeners=$value;
     }
 
     /**
      *容器执行主入口
      */
-    public function execute()
+    public function run()
     {
         try{
-            //初始化参数
-            $this->initParams();
 
             //初始化上下文
             $this->initContext();
-
-            //初始化过滤器
-            $this->initFilters();
-
-            //初始化监听器
-            $this->initListeners();
 
             //开始监听
             $this->listenBefore();
@@ -185,42 +157,6 @@ class Container
                 exit;
             }else{
                 throw $ex;
-            }
-        }
-    }
-
-    /**
-     * 初始化参数
-     */
-    private function initParams()
-    {
-        //全局配置节点
-        $configData = $this->m_config->getConfigValues(BuiltInConst::$globalConfigSection);
-
-        //容器节点的配置值(相同属性名覆盖)
-        $_configData=$this->m_config->getConfigValues($this->m_configSection);
-        if(!empty($_configData) && array_key_exists(self::$PARAMS_CONFIG_KEY, $_configData)){
-            $_configData=$_configData[self::$PARAMS_CONFIG_KEY];
-            foreach ($_configData as $key=>$value){
-                $configData[$key]=$value;
-            }
-        }
-
-        //注入到属性
-        foreach ($configData as $name=>$value){
-            $setter = "set" . ucfirst($name);
-            if (method_exists($this, $setter)) {
-                try{
-                    if(strtolower($value)=="true"){
-                        $value=true;
-                    }else if(strtolower($value)=="false"){
-                        $value=false;
-                    }else if(strpos(strtolower($value), "ref:")===0){
-                        $objId=substr($value, 4);
-                        $value=ObjectFactory::getInstance($this->m_config)->create($objId);
-                    }
-                    $this->$setter($value);
-                }catch (\Exception $ex){}
             }
         }
     }
@@ -273,46 +209,6 @@ class Container
         //context
         $this->m_context=new Context($req,$rsp);
         $this->m_context->setConfiguration($this->m_config);
-    }
-
-    /**
-     * 初始化过滤器
-     */
-    private function initFilters()
-    {
-        $_configValues=$this->m_config->getConfigValues($this->m_configSection);
-        if(!array_key_exists(self::$FILTERS_CONFIG_KEY, $_configValues)){
-            return;
-        }
-        $filterConfigs=$_configValues[self::$FILTERS_CONFIG_KEY];
-        if(empty($filterConfigs)){
-            return;
-        }
-        foreach ($filterConfigs as $filterConfig){
-            $objId=$filterConfig["class"];
-            $filter=ObjectFactory::getInstance($this->m_config)->create($objId);
-            $this->m_filters[]=$filter;
-        }
-    }
-
-    /**
-     * 初始化监听器
-     */
-    private function initListeners()
-    {
-        $_configValues=$this->m_config->getConfigValues($this->m_configSection);
-        if(!array_key_exists(self::$LISTENERS_CONFIG_KEY, $_configValues)){
-            return;
-        }
-        $listenerConfigs=$_configValues[self::$LISTENERS_CONFIG_KEY];
-        if(empty($listenerConfigs)){
-            return;
-        }
-        foreach ($listenerConfigs as $listenerConfig){
-            $objId=$listenerConfig["class"];
-            $filter=ObjectFactory::getInstance($this->m_config)->create($objId);
-            $this->m_listeners[]=$filter;
-        }
     }
 
     /**

@@ -9,12 +9,13 @@
 
 namespace swiftphp\core\config;
 
+
 /**
  * 从xml文件创建配置实例
  * @author Administrator
  *
  */
-class XmlConfiguration implements IConfiguration
+class XmlConfiguration extends ConfigurationAbstract
 {
 
     /**
@@ -34,18 +35,6 @@ class XmlConfiguration implements IConfiguration
      * @var array
      */
     private $m_configFiles=[];
-
-    /**
-     * 应用根目录
-     * @var string
-     */
-    private $m_baseDir="";
-
-    /**
-     * 用户根目录
-     * @var string
-     */
-    private $m_userDir="";
 
     /**
      * 构造函数,$configFile参数为配置xml文件名
@@ -132,45 +121,6 @@ class XmlConfiguration implements IConfiguration
     public function getConfigDir()
     {
         return dirname($this->m_configFile);
-    }
-
-    /**
-     *获取当前应用根目录(若未设置应用根目录,则返回配置入口文件所在目录)
-     */
-    public function getBaseDir()
-    {
-        if(!empty($this->m_baseDir))
-            return $this->m_baseDir;
-        return $this->getConfigDir();
-    }
-
-    /**
-     * 设置当前应用根目录
-     */
-    public function setBaseDir($value)
-    {
-        $this->m_baseDir=$value;
-    }
-
-
-    /**
-     * 获取用户目录(未设置时应该返回应用根目录)
-     */
-    public function getUserDir()
-    {
-        if(!empty($this->m_userDir)){
-            return $this->m_userDir;
-        }
-        return $this->getBaseDir();
-    }
-
-    /**
-     * 设置用户目录
-     * @param string $value
-     */
-    public function setUserDir($value)
-    {
-        $this->m_userDir=$value;
     }
 
     /**
