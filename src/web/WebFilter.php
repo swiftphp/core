@@ -124,7 +124,7 @@ class WebFilter implements IFilter,IConfigurable
 
         //如果外部没有注入,从对象工厂创建
         if(is_null($factory)){
-            $factory=ObjectFactory::getInstance($this->m_config)->createByClass($defaultFactoryClass);
+            $factory=$this->m_config->getObjectFactory()->createByClass($defaultFactoryClass);
         }
 
         //返回工厂实例
