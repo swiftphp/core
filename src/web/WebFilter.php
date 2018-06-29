@@ -9,7 +9,6 @@ use swiftphp\core\http\FilterChain;
 use swiftphp\core\web\IView;
 use swiftphp\core\http\IOutput;
 use swiftphp\core\web\out\Base;
-use swiftphp\core\config\ObjectFactory;
 use swiftphp\core\web\out\HtmlView;
 
 /**
