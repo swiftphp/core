@@ -73,8 +73,12 @@ class NumberFormat extends TagBase
      */
     public function getContent(&$outputParams=[])
     {
-        return number_format($this->m_value,$this->m_decimals,$this->m_decimalpoint,$this->m_separator);
+        $exp=trim($this->m_value);
+        $code="return (".$exp.");";
+        $value=0;
+        try{
+            $value=eval($code);
+        }catch (\Exception $ex){}
+        return number_format($value,$this->m_decimals,$this->m_decimalpoint,$this->m_separator);
     }
-
 }
-
