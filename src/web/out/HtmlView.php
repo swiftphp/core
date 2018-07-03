@@ -80,7 +80,6 @@ class HtmlView extends View implements IOutput
         //合并视图的模板与部件,预处理标签
         $viewCacheFile=$this->m_runtimeDir."/".md5($view);
         $tagLibInfoCacheFile=$this->m_runtimeDir."/".md5(md5(md5($view)));
-        $this->m_debug=false;
         if(!$this->m_debug && file_exists($viewCacheFile)){
             //从缓存文件读取
             $view=file_get_contents($viewCacheFile);
