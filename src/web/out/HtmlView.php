@@ -83,7 +83,6 @@ class HtmlView extends View implements IOutput
         if(!$this->m_debug && file_exists($viewCacheFile)){
             //从缓存文件读取
             $view=file_get_contents($viewCacheFile);
-
             //taglibs
             if(file_exists($tagLibInfoCacheFile)){
                 $this->m_taglibs=unserialize(file_get_contents($tagLibInfoCacheFile));
