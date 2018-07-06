@@ -1503,7 +1503,7 @@ class Dao implements IDao, IConfigurable
                 foreach ($_tableObj->getColumnNames() as $dbField){
                     $field=EntityUtil::mapModelField($class, $dbField);
                     $space=" ";
-                    if(strpos($exp, $name.".")===0){
+                    if(strpos($exp, $name.".")===0||strpos($exp, "(".$name.".")==strpos($exp, $name.".")-1){
                         $space="";
                     }
                     $exp=str_replace($space.$name.".".$dbField, $space.$_alias.".".$dbField, $exp);
