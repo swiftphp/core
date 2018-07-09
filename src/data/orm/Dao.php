@@ -1107,6 +1107,7 @@ class Dao implements IDao, IConfigurable
         $table=$this->getOrmConfig()->getTable($modelClass);
         $sql="";
         $groupBy="";
+        $returnFdMap=[];
         foreach ($funcMap as $func=>$fd){
             if(!empty($sql)){
                 $sql.=",";
@@ -1117,7 +1118,16 @@ class Dao implements IDao, IConfigurable
                 $_fd=$fd[0];
                 $_returnFd=$fd[1];
             }
-            $sql.=$func."(".$table->getAlias().".".$_fd.") AS ".$_returnFd;
+
+            $_returnFdX="";
+            if(array_key_exists($_returnFd, $returnFdMap)){
+                $_returnFdX=$returnFdMap[$_returnFd];
+            }else{
+                $_returnFdX="_".$_returnFd."_".uniqid();
+                $returnFdMap[$_returnFd]=$_returnFdX;
+            }
+
+            $sql.=$func."(".$table->getAlias().".".$_fd.") AS ".$_returnFdX;
         }
         if(!is_array($groupFields) && !empty($groupFields)){
             $groupFields=[$groupFields];
@@ -1135,8 +1145,17 @@ class Dao implements IDao, IConfigurable
             }
         }
 
-
+        //sql
         $sql="SELECT ".$sql." FROM ".$table->getName()." ".$table->getAlias();
+
+        //一对多的过滤
+        $joins=$this->compileManyToOneExp($table->getManyToOneJoins(), $filter);
+        if(!empty($joins)){
+            foreach ($joins as $_alias => $_join){
+                $sql.=" JOIN ".$_join->getTable()." ".$_alias." ON ".$_join->getOn()."\r\n";
+            }
+        }
+
         if(!empty($filter)){
             $sql.=" WHERE ".$filter;
         }
@@ -1146,7 +1165,11 @@ class Dao implements IDao, IConfigurable
         if(!empty($sort)){
             $sql.=" ORDER BY ".$this->addAliasToFieldExp($sort, $table->getAlias());
         }
-        $sql=$this->mapSqlExpression($modelClass, $sql);
+        $sql=$this->mapSqlExpression($modelClass, $sql,true);
+
+        foreach ($returnFdMap as $fd=>$fdx){
+            $sql=str_replace($fdx, $fd, $sql);
+        }
         return $this->getDatabase()->query($sql,$params);
     }
 
