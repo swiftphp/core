@@ -11,6 +11,42 @@ use swiftphp\core\BuiltInConst;
 class ObjectFactory implements IObjectFactory,IConfigurable
 {
     /**
+     * 对象配置键:对象id
+     */
+    private const OBJECT_CONFIG_KEY_ID="id";
+
+    /**
+     * 对象配置键:对象类名
+     */
+    private const OBJECT_CONFIG_KEY_CLASS="class";
+
+    /**
+     * 对象配置键:是否单例模式
+     */
+    private const OBJECT_CONFIG_KEY_SINGLETON="singleton";
+
+    /**
+     * 对象配置键:构造参数
+     */
+    private const OBJECT_CONFIG_KEY_CONSTRUCTOR_ARGS="constructor-args";
+
+    /**
+     * 对象配置:应用目录占位符
+     */
+    private const OBJECT_CONFIG_BASE_DIR_PLACE_HOLDER="\${baseDir}";
+
+    /**
+     * 对象配置:用户目录占位符
+     */
+    private const OBJECT_CONFIG_USER_DIR_PLACE_HOLDER="\${userDir}";
+
+    /**
+     * 对象配置:配置根目录占位符
+     */
+    private const OBJECT_CONFIG_CONFIG_DIR_PLACE_HOLDER="\${configDir}";
+
+
+    /**
      * 配置实例
      * @var IConfiguration
      */
@@ -61,7 +97,7 @@ class ObjectFactory implements IObjectFactory,IConfigurable
         //对象配置信息
         $objInfo=$this->getObjInfo($objectId);
         if($objInfo==null){
-            return null;
+            throw new \Exception("Call to undefined object '".$objectId."'");
         }
 
         //如果单例模式且对象已经存在,直接返回
@@ -71,9 +107,9 @@ class ObjectFactory implements IObjectFactory,IConfigurable
 
         //创建对象
         if(!class_exists($objInfo->class)){
-            return null;
+            throw new \Exception("Class '".$objInfo->class."' not found");
         }
-        $obj=new $objInfo->class();
+        $obj=$this->newInstance($objInfo->class,$objInfo->constructorArgs);
 
         //注入全局属性(全局属性只有值类型)
         foreach ($this->m_config->getConfigValues(BuiltInConst::$globalConfigSection) as $name=>$value){
@@ -101,16 +137,17 @@ class ObjectFactory implements IObjectFactory,IConfigurable
 
     /**
      * 根据类型名创建实例
-     * @param string $class     类型名称
-     * @param bool $singleton   是否单例模式,默认为单例模式
+     * @param string $class             类型名称
+     * @param array $constructorArgs    构造参数(对于已配置的类型,该参数忽略)
+     * @param bool $singleton           是否单例模式,默认为单例模式(对于已配置的类型,该参数忽略)
      */
-    public function createByClass($class,$singleton=true)
+    public function createByClass($class,$constructorArgs=[],$singleton=true)
     {
-        //使用类型名代替ID创建对象
-        $obj=$this->create($class);
-        if(!is_null($obj)){
+        //使用类型名代替ID创建对象,异常代表类型未配置,无需抛出
+        try{
+            $obj=$this->create($class);
             return $obj;
-        }
+        }catch (\Exception $ex){}
 
         //单例模式下,尝试从缓存获取
         if($singleton && array_key_exists($class, $this->m_singletonObjMap)){
@@ -122,9 +159,9 @@ class ObjectFactory implements IObjectFactory,IConfigurable
 
         //直接从类型名创建对象
         if(!class_exists($class)){
-            return null;
+            throw new \Exception("Class '".$class."' not found");
         }
-        $obj=new $class();
+        $obj=$this->newInstance($class,$constructorArgs);
 
         //注入全局属性(全局属性只有值类型)
         foreach ($this->m_config->getConfigValues(BuiltInConst::$globalConfigSection) as $name=>$value){
@@ -142,6 +179,53 @@ class ObjectFactory implements IObjectFactory,IConfigurable
         }
 
         //返回对象
+        return $obj;
+    }
+
+    /**
+     * 创建对象实例
+     * @param string $forClass       类名
+     * @param array $constructorArgs 构造参数
+     * @return object
+     * @throws \Exception
+     */
+    public function newInstance($forClass,$constructorArgs=[])
+    {
+        $class = new \ReflectionClass($forClass);
+        $constructor = $class->getConstructor();
+
+        //无构造函数
+        if($constructor==null){
+            return new $forClass();
+        }
+
+        //有构造函数
+        $parameters=$constructor->getParameters();
+        $paramValues=[];
+        for($i=0;$i<count($parameters);$i++){
+            $parameter=$parameters[$i];
+            $name=$parameter->name;
+            $isDefaultValueAvailable=$parameter->isDefaultValueAvailable();
+//             $allowsNull=$parameter->allowsNull();
+//             $isArray=$parameter->isArray();
+//             $isOptional=$parameter->isOptional();
+
+            //参数取值:配置>默认
+            if(array_key_exists($name, $constructorArgs)){
+                //按参数名取值
+                $paramValues[]=$this->getPropertyValue($constructorArgs[$name]);
+            }else if(array_key_exists($i, $constructorArgs)){
+                //按顺序取值
+                $paramValues[]=$this->getPropertyValue($constructorArgs[$i]);
+            }else if($isDefaultValueAvailable){
+                $paramValues[]=$parameter->getDefaultValue();
+            }else{
+                throw new \Exception("Too few arguments to function ".$forClass."::__construct()");
+            }
+        }
+
+        //创建实例
+        $obj = $class->newInstanceArgs($paramValues);
         return $obj;
     }
 
@@ -173,25 +257,37 @@ class ObjectFactory implements IObjectFactory,IConfigurable
     {
         $infos=[];
         foreach ($configData as $cfg){
-            if(array_key_exists("class", $cfg)){
+            if(array_key_exists(self::OBJECT_CONFIG_KEY_CLASS, $cfg)){
                 $info=new ObjectInfo();
-                $info->class=$cfg["class"];
-                $info->id=array_key_exists("id", $cfg)?$cfg["id"]:$cfg["class"];
+                $info->class=$cfg[self::OBJECT_CONFIG_KEY_CLASS];
+                $info->id=array_key_exists(self::OBJECT_CONFIG_KEY_ID, $cfg)?$cfg[self::OBJECT_CONFIG_KEY_ID]:$cfg[self::OBJECT_CONFIG_KEY_CLASS];
 
                 //属性
                 $info->propertyInfos=[];
                 foreach ($cfg as $key=>$value){
-                    if($key!="id" && $key!="class" && $key!="singleton"){
+                    if($key!=self::OBJECT_CONFIG_KEY_ID
+                        && $key!=self::OBJECT_CONFIG_KEY_CLASS
+                        && $key!=self::OBJECT_CONFIG_KEY_SINGLETON
+                        && $key!=self::OBJECT_CONFIG_KEY_CONSTRUCTOR_ARGS){
                         $info->propertyInfos[$key]=$value;
                     }
                 }
 
                 //单例模式
                 $info->singleton=true;
-                if(array_key_exists("singleton", $cfg)){
-                    $val=$cfg["singleton"];
+                if(array_key_exists(self::OBJECT_CONFIG_KEY_SINGLETON, $cfg)){
+                    $val=$cfg[self::OBJECT_CONFIG_KEY_SINGLETON];
                     if($val=="0"||strtolower($val)=="false"){
                         $info->singleton=false;
+                    }
+                }
+
+                //构造器参数
+                $info->constructorArgs=[];
+                if(array_key_exists(self::OBJECT_CONFIG_KEY_CONSTRUCTOR_ARGS, $cfg)){
+                    $args=$cfg[self::OBJECT_CONFIG_KEY_CONSTRUCTOR_ARGS];
+                    foreach ($args as $key=>$value){
+                        $info->constructorArgs[$key]=$value;
                     }
                 }
 
@@ -231,7 +327,8 @@ class ObjectFactory implements IObjectFactory,IConfigurable
         if(is_array($value)){
             $values=[];
             foreach ($value as $k => $v){
-                $values[$k]=$this->getPropertyValue($v);
+                $key=$this->replacePlaceHolder($k);
+                $values[$key]=$this->getPropertyValue($v);
             }
             return $values;
         }
@@ -245,7 +342,21 @@ class ObjectFactory implements IObjectFactory,IConfigurable
             //对象引用,递归创建对象
             $refObjId=substr($value, 4);
             $value=$this->create($refObjId);
+        }else{
+            $value=$this->replacePlaceHolder($value);
         }
+        return $value;
+    }
+
+    /**
+     * 替换占位符
+     * @param string $value
+     */
+    private function replacePlaceHolder($value)
+    {
+        $value=str_replace(self::OBJECT_CONFIG_BASE_DIR_PLACE_HOLDER, $this->m_config->getBaseDir(), $value);
+        $value=str_replace(self::OBJECT_CONFIG_USER_DIR_PLACE_HOLDER, $this->m_config->getUserDir(), $value);
+        $value=str_replace(self::OBJECT_CONFIG_CONFIG_DIR_PLACE_HOLDER, $this->m_config->getConfigDir(), $value);
         return $value;
     }
 }
@@ -281,5 +392,11 @@ class ObjectInfo
      * @var array
      */
     public $propertyInfos=[];
+
+    /**
+     * 构造器参数,键为参数名,值为参数描述
+     * @var array
+     */
+    public $constructorArgs=[];
 }
 
