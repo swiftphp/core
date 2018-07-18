@@ -39,6 +39,17 @@ class DateTime
     }
 
     /**
+     * 转为系统\DateTime对象
+     * @return \DateTime
+     */
+    public function toDateTime()
+    {
+        $dateTime=new \DateTime();
+        $dateTime->setTimestamp($this->_time);
+        return $dateTime;
+    }
+
+    /**
      * 格式化为年月日时分秒字符串
      * @param string $format 格式化
      */
