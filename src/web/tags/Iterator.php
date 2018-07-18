@@ -3,6 +3,7 @@ namespace swiftphp\core\web\tags;
 
 use swiftphp\core\web\HtmlHelper;
 use swiftphp\core\utils\ObjectUtil;
+use swiftphp\core\utils\Convert;
 
 /**
  * 遍历数据集合标签
@@ -125,10 +126,9 @@ class Iterator extends TagBase
         $data=[];
         $showTree=strtolower($this->showTree);
         if($showTree=="true"||$showTree=="1"){
-            foreach ($this->dataSource as $dr){
-                if((is_object($dr) && ObjectUtil::getPropertyValue($dr, $this->parentKey)==$this->rootKey)
-                    ||(is_array($dr) && array_key_exists($this->parentKey, $dr) && $dr[$this->parentKey]==$this->rootKey)){
-                        $data[]=$dr;
+            foreach ($this->dataSource as $item){
+                if(Convert::getFieldValue($item, $this->parentKey,true)==$this->rootKey){
+                    $data[]=$item;
                 }
             }
         }else{
@@ -245,10 +245,9 @@ class Iterator extends TagBase
         }else if(array_key_exists("parent", $childAttr)){
             //从数据源搜索
             $values=[];
-            foreach ($this->dataSource as $dr){
-                if((is_object($dr) && ObjectUtil::getPropertyValue($dr, $this->parentKey)==$key)
-                    ||(is_array($dr) && array_key_exists($this->parentKey, $dr) && $dr[$this->parentKey]==$value)){
-                        $values[]=$dr;
+            foreach ($this->dataSource as $item){
+                if(Convert::getFieldValue($item, $this->parentKey,true)==$value){
+                    $values[]=$item;
                 }
             }
             return $values;

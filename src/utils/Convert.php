@@ -63,6 +63,39 @@ class Convert
     }
 
     /**
+     * 获取对象或数组字段值
+     * @param object|array $item       数组或对象
+     * @param string $field            字段名或数组键
+     * @param bool $objectFieldAccess  获取对象属性时,是否允许直接访问对象的属性(默认为false,只能通过getter取值)
+     * @return mixed
+     */
+    public static function getFieldValue($item,$field,$objectFieldAccess=false)
+    {
+        if(is_array($item) && array_key_exists($field, $item)){
+            return $item[$field];
+        }else if(is_object($item)){
+            return ObjectUtil::getPropertyValue($item, $field,$objectFieldAccess);
+        }
+        return null;
+    }
+
+    /**
+     * 设置对象或数组字段值
+     * @param object|array $item            数组或对象
+     * @param unknown $field                字段名或数组键
+     * @param unknown $value                字段值或数组值
+     * @param string $objectFieldAccess     设置对象属性时,是否允许直接访问对象的属性(默认为false,只能通过etter设置)
+     */
+    public static function setFieldValue(&$item,$field,$value,$objectFieldAccess=false)
+    {
+        if(is_array($item)){
+            $item[$field]=$value;
+        }else if(is_object($item)){
+            ObjectUtil::setPropertyValue($item, $field, $value,$objectFieldAccess);
+        }
+    }
+
+    /**
      * 将位结构的数组转化为整型值
      * @param $value 位结构的数组(1,2,4...)
      * @return int

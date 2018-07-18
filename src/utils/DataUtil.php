@@ -53,9 +53,11 @@ class DataUtil
 
         //添加自身
         if($includeSelf){
-            foreach($source as $arr){
-                if($arr[$idField] == $fieldValue){
-                    $returnValue[]=$arr;
+            foreach($source as $item){
+                $value=Convert::getFieldValue($item, $idField,true);
+                if($value == $fieldValue){
+                    $returnValue[]=$item;
+                    break;
                 }
             }
         }
@@ -131,18 +133,20 @@ class DataUtil
             return [];
         }
         $returnValue=[];
-        foreach($source as $arr){
-            if($arr[$pidField] == $fieldValue){
-                $returnValue[]=$arr;
-                $index=array_search($arr,$source);
+        foreach($source as $item){
+            $pvalue=Convert::getFieldValue($item, $pidField,true);
+            if($pvalue == $fieldValue){
+                $returnValue[]=$item;
+                $index=array_search($item,$source);
                 if(null!=$index){
                     unset($source[$index]);
                 }
             }
         }
         $rootArray=$returnValue;
-        foreach($rootArray as $arr){
-            $temp=self::_getOffSprings($source,$idField,$pidField,$arr[$idField],$level,$currentLevel+1);
+        foreach($rootArray as $item){
+            $value=Convert::getFieldValue($item, $idField,true);
+            $temp=self::_getOffSprings($source,$idField,$pidField,$value,$level,$currentLevel+1);
             if(count($temp)>0){
                 $returnValue=array_merge_recursive($returnValue,$temp);
             }
