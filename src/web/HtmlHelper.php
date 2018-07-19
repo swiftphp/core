@@ -79,9 +79,12 @@ class HtmlHelper
             return $inputParam->$getter();
         }
 
-        //从属性取值
-        $vars=get_object_vars($inputParam);
-        if(array_key_exists($paramKey, $vars)){
+        //从属性取值(这种写法不行,对于延时加载的数据无法取值)
+//         $vars=get_object_vars($inputParam);
+//         if(array_key_exists($paramKey, $vars)){
+//             return $inputParam->$paramKey;
+//         }
+        if(property_exists($inputParam, $paramKey)){
             return $inputParam->$paramKey;
         }
 

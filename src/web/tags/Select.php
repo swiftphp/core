@@ -7,11 +7,8 @@ namespace swiftphp\core\web\tags;
  * @author Tomix
  *
  */
-class Select extends TagBase
+class Select extends AbstractListItemBase
 {
-    private $dataSource=[];
-    private $valueField;
-    private $textField;
     private $checkedValue;
 
     private $showTree=false;
@@ -28,18 +25,6 @@ class Select extends TagBase
 
 	private $items=[];
 
-	public function setDataSource($value)
-	{
-	    $this->dataSource = $value;
-	}
-	public function setValueField($value)
-	{
-	    $this->valueField = $value;
-	}
-	public function setTextField($value)
-	{
-	    $this->textField = $value;
-	}
 	public function setCheckedValue($value)
 	{
 	    $this->checkedValue = $value;
@@ -95,7 +80,7 @@ class Select extends TagBase
 	public function getContent(&$outputParams=[])
 	{
 		if(is_array($this->dataSource) && count($this->dataSource)>0){
-			$this->bindData();
+			$this->items=$this->buildDataItems();
 		}
 
 		$clientItems=$this->loadClientItems();
@@ -126,42 +111,18 @@ class Select extends TagBase
 				$builder.=$option;
 			}
 		}else{
-			foreach($this->items as $item){
+			foreach($this->items as $value=>$text){
 				$option="<option value=\"{0}\">{1}</option>";
-				if($item["value"]==$this->checkedValue){
+				if($value==$this->checkedValue){
 					$option="<option selected=\"selected\" value=\"{0}\">{1}</option>";
 				}
-				$option=str_replace("{0}",$item["value"],$option);
-				$option=str_replace("{1}",$item["text"],$option);
+				$option=str_replace("{0}",$value,$option);
+				$option=str_replace("{1}",$text,$option);
 				$builder.=$option."\r\n";
 			}
 		}
 		$builder.="</select>";
 		return $builder;
-	}
-
-	/**
-	 * 绑定数据，当设置了$dataSource属性时，将自动执行此方法，把数据映射到控件
-	 * @return void
-	 */
-	private function bindData()
-	{
-	    $this->items=[];
-	    if(count($this->dataSource)==count($this->dataSource,COUNT_RECURSIVE)){
-	        foreach(array_keys($this->dataSource) as $key){
-	            $item=["value"=>$key,"text"=>$this->dataSource[$key]];
-	            $this->items[]=$item;
-	        }
-	    }else{
-	        if($this->showTree){
-	            $this->buildTreeItems();
-	        }else{
-	            foreach($this->dataSource as $row){
-	                $item=["value"=>$row[$this->valueField],"text"=>$row[$this->textField]];
-	                $this->items[]=$item;
-	            }
-	        }
-	    }
 	}
 
 	/**

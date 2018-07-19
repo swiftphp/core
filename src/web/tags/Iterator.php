@@ -2,7 +2,6 @@
 namespace swiftphp\core\web\tags;
 
 use swiftphp\core\web\HtmlHelper;
-use swiftphp\core\utils\ObjectUtil;
 use swiftphp\core\utils\Convert;
 
 /**
@@ -177,8 +176,8 @@ class Iterator extends TagBase
                 $_template=str_replace($child["outerHtml"], $childTemplate, $_template);
             }
 
-            $_template=$this->buildTemplateRow($_template, $line, "/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$outParams);
             $_template=$this->buildTemplateRow($_template, $line, "/#{[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$outParams);
+            $_template=$this->buildTemplateRow($_template, $line, "/\\\${[\s]{0,}([^\s]{1,})[\s]{0,}}/isU",$outParams);
 
             //状态信息行
             if(!empty($this->status)){
@@ -271,15 +270,18 @@ class Iterator extends TagBase
                 $paramKey=$matches[1][$i];
                 $value=HtmlHelper::getUIParams($dataRow, $paramKey);
 
-                if(is_array($value)||is_object($value)){
-                    //数组或对象,附加到输出参数
-                    $key=uniqid()."-".$paramKey;//唯一key
-                    $outParams[$key]=$value;
-                    //转为${key}表达式的全局参数
-                    $template=str_replace($search, "\${".$key."}", $template);
-                }else if(is_numeric($value)||is_string($value)){
-                    //数字或字符串,替换
-                    $template=str_replace($search, $value, $template);
+                //特殊情况:bool(false)值被认为取值失败
+                if($value){
+                    if(is_array($value)||is_object($value)){
+                        //数组或对象,附加到输出参数
+                        $key=uniqid()."-".$paramKey;//唯一key
+                        $outParams[$key]=$value;
+                        //转为${key}表达式的全局参数
+                        $template=str_replace($search, "\${".$key."}", $template);
+                    }else if(is_numeric($value)||is_string($value)||is_bool($value)){
+                        //数字或字符串,替换
+                        $template=str_replace($search, $value, $template);
+                    }
                 }
             }
         }

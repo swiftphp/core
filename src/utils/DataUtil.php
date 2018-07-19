@@ -19,19 +19,23 @@ class DataUtil
      */
     public static function getAncestors($source,$idField,$pidField,$fieldValue,$includeSelf=true)
     {
-        $returnValue=array();
-        $current=array();
+        $returnValue=[];
+        $current=null;
         foreach($source as $row){
-            if($row[$idField]==$fieldValue){
+            $idValue=Convert::getFieldValue($row, $idField);
+            if($idValue==$fieldValue){
                 $current=$row;
-                if($includeSelf)
+                if($includeSelf){
                     $returnValue[]=$current;
-                    break;
+                }
+                break;
             }
         }
-        while($current[$pidField] > 0){
-            $current=self::_getAncestors($source,$idField,$current[$pidField]);
+        $pidValue=Convert::getFieldValue($current, $pidField);
+        while($pidValue){
+            $current=self::_getAncestors($source,$idField,$pidValue);
             $returnValue[]=$current;
+            $pidValue=Convert::getFieldValue($current, $pidField);
         }
 
         //echo $returnValue[1][$idField];
@@ -164,7 +168,8 @@ class DataUtil
     private static function _getAncestors($source,$idField,$fieldValue)
     {
         foreach($source as $row){
-            if($row[$idField] == $fieldValue){
+            $value=Convert::getFieldValue($row, $idField);
+            if($value == $fieldValue){
                 return $row;
             }
         }

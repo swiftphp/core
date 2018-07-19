@@ -98,7 +98,7 @@ class ObjectUtil
         $getter=self::getGetter($obj, $propertyName);
         if(!empty($getter)){
             return $obj->$getter();
-        }else if($fieldAccess && array_key_exists($propertyName, get_object_vars($obj))){
+        }else if($fieldAccess && property_exists($obj, $propertyName)){
             return $obj->$propertyName;
         }
     }
