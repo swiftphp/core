@@ -20,7 +20,7 @@ class ObjectUtil
         if (method_exists($class, $getter)) {
             return $getter;
         }
-        return "";
+        return null;
     }
 
     /**
@@ -35,7 +35,7 @@ class ObjectUtil
         if (method_exists($class, $setter)) {
             return $setter;
         }
-        return "";
+        return null;
     }
 
     /**

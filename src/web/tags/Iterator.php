@@ -207,8 +207,8 @@ class Iterator extends TagBase
                     for($j=0;$j<count($matches[0]);$j++){
                         $key=$matches[1][$j];
                         $search=$matches[0][$j];
-                        $value=HtmlHelper::getUIParams($parentRow, $key);
-                        if($value){
+                        $value=null;
+                        if(HtmlHelper::getUIParams($parentRow, $key,$value)){
                             $_template=str_replace($search, $value, $_template);
                         }
                     }
@@ -236,20 +236,21 @@ class Iterator extends TagBase
         $key=str_replace("\${", "", $key);
         $key=str_replace("}", "", $key);
         $key=trim($key);
-        $value=HtmlHelper::getUIParams($parentRow, $key);
-
-        if(array_key_exists("data", $childAttr)){
-            //直接从属性返回
-            return $value;
-        }else if(array_key_exists("parent", $childAttr)){
-            //从数据源搜索
-            $values=[];
-            foreach ($this->dataSource as $item){
-                if(Convert::getFieldValue($item, $this->parentKey,true)==$value){
-                    $values[]=$item;
+        $value=null;
+        if(HtmlHelper::getUIParams($parentRow, $key,$value)){
+            if(array_key_exists("data", $childAttr)){
+                //直接从属性返回
+                return $value;
+            }else if(array_key_exists("parent", $childAttr)){
+                //从数据源搜索
+                $values=[];
+                foreach ($this->dataSource as $item){
+                    if(Convert::getFieldValue($item, $this->parentKey,true)==$value){
+                        $values[]=$item;
+                    }
                 }
+                return $values;
             }
-            return $values;
         }
     }
 
@@ -268,10 +269,8 @@ class Iterator extends TagBase
             for($i=0;$i<count($matches[0]);$i++){
                 $search=$matches[0][$i];
                 $paramKey=$matches[1][$i];
-                $value=HtmlHelper::getUIParams($dataRow, $paramKey);
-
-                //特殊情况:bool(false)值被认为取值失败
-                if($value){
+                $value=null;
+                if(HtmlHelper::getUIParams($dataRow, $paramKey,$value)){
                     if(is_array($value)||is_object($value)){
                         //数组或对象,附加到输出参数
                         $key=uniqid()."-".$paramKey;//唯一key

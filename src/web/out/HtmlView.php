@@ -206,18 +206,20 @@ class HtmlView extends View implements IOutput
                 $keys=$matches[1];
                 for($i=0;$i<count($keys);$i++){
                     $key=$keys[$i];
-                    //$_value=$this->getUIParams($this->m_tagParams,$key);
-                    $_value=HtmlHelper::getUIParams($outputParams, $key);//先从递归的参数取值
-                    if(!$_value){
-                        $_value=HtmlHelper::getUIParams($this->m_tagParams, $key);//从全局参数取值
+                    $_value=null;
+                    $hasValue=HtmlHelper::getUIParams($outputParams, $key,$_value);//先从递归的参数取值
+                    if(!$hasValue){
+                        $hasValue=HtmlHelper::getUIParams($this->m_tagParams, $key,$_value);//从全局参数取值
                     }
-                    if(!is_array($_value) && !is_object($_value)){
-                        $holder=$holders[$i];
-                        $value=str_replace($holder, $_value, $value);
-                    }else{
-                        //取出来的值为对象或数组,则忽略后面的参数
-                        $value=$_value;
-                        break;
+                    if($hasValue){
+                        if(!is_array($_value) && !is_object($_value)){
+                            $holder=$holders[$i];
+                            $value=str_replace($holder, $_value, $value);
+                        }else{
+                            //取出来的值为对象或数组,则忽略后面的参数
+                            $value=$_value;
+                            break;
+                        }
                     }
                 }
             }
