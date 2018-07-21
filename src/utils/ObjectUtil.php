@@ -81,7 +81,7 @@ class ObjectUtil
         $setter=self::getSetter($obj, $propertyName);
         if(!empty($setter)){
             $obj->$setter($value);
-        }else if($fieldAccess && array_key_exists($propertyName, get_object_vars($obj))){
+        }else if($fieldAccess && property_exists($obj, $propertyName)){
             $obj->$propertyName=$value;
         }
     }
