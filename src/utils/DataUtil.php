@@ -22,7 +22,7 @@ class DataUtil
         $returnValue=[];
         $current=null;
         foreach($source as $row){
-            $idValue=Convert::getFieldValue($row, $idField);
+            $idValue=Convert::getFieldValue($row, $idField,true);
             if($idValue==$fieldValue){
                 $current=$row;
                 if($includeSelf){
@@ -31,11 +31,11 @@ class DataUtil
                 break;
             }
         }
-        $pidValue=Convert::getFieldValue($current, $pidField);
+        $pidValue=Convert::getFieldValue($current, $pidField,true);
         while($pidValue){
             $current=self::_getAncestors($source,$idField,$pidValue);
             $returnValue[]=$current;
-            $pidValue=Convert::getFieldValue($current, $pidField);
+            $pidValue=Convert::getFieldValue($current, $pidField,true);
         }
 
         //echo $returnValue[1][$idField];
@@ -168,7 +168,7 @@ class DataUtil
     private static function _getAncestors($source,$idField,$fieldValue)
     {
         foreach($source as $row){
-            $value=Convert::getFieldValue($row, $idField);
+            $value=Convert::getFieldValue($row, $idField,true);
             if($value == $fieldValue){
                 return $row;
             }
