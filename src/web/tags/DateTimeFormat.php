@@ -21,6 +21,12 @@ class DateTimeFormat extends TagBase
     private $m_string;
 
     /**
+     * DateTime对象
+     * @var \DateTime
+     */
+    private $m_object;
+
+    /**
      * 格式
      * @var integer
      */
@@ -45,6 +51,15 @@ class DateTimeFormat extends TagBase
     }
 
     /**
+     * \DateTime对象
+     * @param \DateTime $value
+     */
+    public function setObject(\DateTime $value)
+    {
+        $this->m_object=$value;
+    }
+
+    /**
      * 输出格式
      * @param string $value
      */
@@ -63,6 +78,8 @@ class DateTimeFormat extends TagBase
             $time=$this->m_time;
         }else if(!empty($this->m_string)){
             $time=strtotime($this->m_string);
+        }else if(!is_null($this->m_object)){
+            $time=$this->m_object->getTimestamp();
         }
         return date($this->m_format,$time);
     }

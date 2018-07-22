@@ -206,6 +206,7 @@ class HtmlView extends View implements IOutput
                 $keys=$matches[1];
                 for($i=0;$i<count($keys);$i++){
                     $key=$keys[$i];
+                    $holder=$holders[$i];
                     $_value=null;
                     $hasValue=HtmlHelper::getUIParams($outputParams, $key,$_value);//先从递归的参数取值
                     if(!$hasValue){
@@ -213,13 +214,15 @@ class HtmlView extends View implements IOutput
                     }
                     if($hasValue){
                         if(!is_array($_value) && !is_object($_value)){
-                            $holder=$holders[$i];
                             $value=str_replace($holder, $_value, $value);
                         }else{
                             //取出来的值为对象或数组,则忽略后面的参数
                             $value=$_value;
                             break;
                         }
+                    }else{
+                        //取不到值,以空替代
+                        $value=str_replace($holder, "", $value);
                     }
                 }
             }
