@@ -117,10 +117,6 @@ class Iterator extends TagBase
      */
     public function getContent(&$outputParams=[])
     {
-        if(!is_array($this->dataSource)){
-            return "";
-        }
-
         //数据
         $data=[];
         $showTree=strtolower($this->showTree);

@@ -70,10 +70,6 @@ class Repeater extends TagBase
 	 */
     public function getContent(&$outputParams=[])
 	{
-		if(!is_array($this->dataSource)){
-			return "";
-		}
-
 		//模板html
 		$template=$this->getInnerHtml();
 		$pattern="/<".$this->templateTag.">(.*)<\/".$this->templateTag.">/isU";
