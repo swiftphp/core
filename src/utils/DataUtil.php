@@ -106,12 +106,13 @@ class DataUtil
     {
         $keys=array();
         foreach($subSource as $item){
-            $keys[]=$item[$idField];
+            $keys[]=Convert::getFieldValue($item, $idField,true);
         }
 
         $returnValue=[];
         foreach($source as $item){
-            if(!in_array($item[$idField],$keys)){
+            $key=Convert::getFieldValue($item, $idField,true);
+            if(!in_array($key,$keys)){
                 $returnValue[]=$item;
             }
         }
