@@ -2,6 +2,8 @@
 namespace swiftphp\core\web\tags;
 
 
+use swiftphp\core\utils\Convert;
+
 /**
  * 下拉框列表控件
  * @author Tomix
@@ -80,7 +82,11 @@ class Select extends AbstractListItemBase
 	public function getContent(&$outputParams=[])
 	{
 		if(is_array($this->dataSource) && count($this->dataSource)>0){
-			$this->items=$this->buildDataItems();
+		    if($this->showTree){
+		        $this->buildTreeItems();
+		    }else{
+		        $this->items=$this->buildDataItems();
+		    }
 		}
 
 		$clientItems=$this->loadClientItems();
@@ -111,7 +117,9 @@ class Select extends AbstractListItemBase
 				$builder.=$option;
 			}
 		}else{
-			foreach($this->items as $value=>$text){
+			foreach($this->items as $item){
+			    $value=$item["value"];
+			    $text=$item["text"];
 				$option="<option value=\"{0}\">{1}</option>";
 				if($value==$this->checkedValue){
 					$option="<option selected=\"selected\" value=\"{0}\">{1}</option>";
@@ -131,7 +139,7 @@ class Select extends AbstractListItemBase
 	 */
 	private function buildTreeItems()
 	{
-	    foreach($this->dataSource as $arr){
+	    foreach($this->dataSource as $obj){
 	        $rootArray=[];
 	        if(isset($this->rootId)){
 	            $rootArray[0]=$this->rootId;
@@ -141,15 +149,17 @@ class Select extends AbstractListItemBase
 	            $rootArray[2]=null;
 	        }
 
-	        if(in_array($arr[$this->pidField],$rootArray)){
+	        $pid=Convert::getFieldValue($obj, $this->pidField,true);
+	        if(in_array($pid,$rootArray)){
 	            //取得根的下一级子数据
 	            $item=[];
-	            $item["value"]=$arr[$this->valueField];
-	            $item["text"]=$this->prefix.$arr[$this->textField];
+	            $item["value"]=Convert::getFieldValue($obj, $this->valueField,true);
+	            $item["text"]=$this->prefix.Convert::getFieldValue($obj, $this->textField,true);
 	            $this->items[]=$item;
 
 	            //取所有子選項
-	            $this->buildChildItems($arr[$this->idField],1);
+	            $id=Convert::getFieldValue($obj, $this->idField,true);
+	            $this->buildChildItems($id,1);
 	        }
 	    }
 	}
@@ -175,15 +185,17 @@ class Select extends AbstractListItemBase
             $sep .= $this->separator;
         }
         $sep.=$this->prefix;
-        foreach($this->dataSource as $arr){
-            if($arr[$this->pidField]==$pid){
+        foreach($this->dataSource as $obj){
+            $pidValue=Convert::getFieldValue($obj, $this->pidField,true);
+            if($pidValue==$pid){
                 $item=[];
-                $item["value"]=$arr[$this->valueField];
-                $item["text"]=$sep.$arr[$this->textField];
+                $item["value"]=Convert::getFieldValue($obj, $this->valueField,true);
+                $item["text"]=$sep.Convert::getFieldValue($obj, $this->textField,true);
                 $this->items[]=$item;
 
                 //取得所有子选项
-                $this->buildChildItems($arr[$this->idField],$level+1);
+                $idValue=Convert::getFieldValue($obj, $this->idField,true);
+                $this->buildChildItems($idValue,$level+1);
             }
         }
 	}

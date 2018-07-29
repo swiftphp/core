@@ -56,6 +56,10 @@ abstract class AbstractListItemBase extends TagBase
 	    $this->textField=$value;
 	}
 
+	/**
+	 * 创建列表项
+	 * @return array
+	 */
 	protected function buildDataItems()
 	{
         if(!is_array($this->dataSource) || count($this->dataSource)==0){
@@ -68,14 +72,16 @@ abstract class AbstractListItemBase extends TagBase
         if(is_array($firstItem)){
             //一维键值对数组
             foreach ($this->dataSource as $key => $value){
-                $items[$key]=$value;
+                //$items[$key]=$value;
+                $items[]=["value"=>$key,"text"=>$value];
             }
         }else{
             //二维表数组
             foreach ($this->dataSource as $item){
                 $value=Convert::getFieldValue($item, $this->valueField, true);
                 $text=Convert::getFieldValue($item, $this->textField, true);
-                $items[$value]=$text;
+                //$items[$value]=$text;
+                $items[]=["value"=>$value,"text"=>$text];
             }
         }
         return $items;
