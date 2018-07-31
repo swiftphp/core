@@ -1,184 +1,138 @@
 <?php
 namespace swiftphp\core\web\tags;
 
-
-use swiftphp\core\utils\ObjectUtil;
-
 /**
  * 复选框列表标签
  * @author Tomix
  *
  */
-class Checkbox extends TagBase
+class Checkbox extends ListItemTagBase
 {
 	/**
-	 * 单选列表框名称
+	 * 名称
 	 * @var string
 	 */
-	private $name;
+	protected $m_name;
 
 	/**
 	 * 默认选中值
 	 * @var array
 	 */
-	private $checkedValues;
+	protected $m_checkedValues;
 
 	/**
-	 * 样式
-	 * @var string
-	 */
-	private $class;
-
-	/**
-	 * 数据源(如果数据源为二维，必须设置$valueField,$titleField属性)
+	 * 自定义选项集(类json格式键值对)
 	 * @var array
 	 */
-	private $dataSource=[];
+	protected $m_items=[];
 
 	/**
-	 * 值字段
-	 * @var string
+	 * 设置名称
+	 * @param string $value
 	 */
-	private $valueField;
-
-	/**
-	 * 文本字段
-	 * @var string
-	 */
-	private $textField;
-
-	/**
-	 * 列表选项集合(二维:,value,text集合)
-	 * @var array
-	 */
-	private $items=[];
-
     public function setName($value)
     {
-        $this->name=$value;
+        $this->m_name=$value;
     }
+
+    /**
+     * 设置默认选中值
+     * @param array $value
+     */
     public function setCheckedValues($value)
     {
-        $this->checkedValues=$value;
+        $this->m_checkedValues=$value;
     }
-    public function setClass($value)
+
+    /**
+     * 自定义选项集(类json格式键值对)
+     * @param string $value
+     */
+    public function setItems($value)
     {
-        $this->class=$value;
-    }
-    public function setDataSource($value)
-    {
-        $this->dataSource=$value;
-    }
-    public function setValueField($value)
-    {
-        $this->valueField=$value;
-    }
-    public function setTextField($value)
-    {
-        $this->textField=$value;
+        $this->m_items=$value;
     }
 
 
 	/**
-	 * 获取标签渲染后的内容
+	 * 实现父类getContent()抽象方法,取得控件呈现给客户端的内容
 	 * {@inheritDoc}
 	 * @see \swiftphp\core\web\tags\TagBase::getContent()
 	 */
     public function getContent(&$outputParams=[])
-	{
-	    if(is_array($this->dataSource) && count($this->dataSource)>0){
-	        $this->bindData();
-	    }
-	    $this->loadClientItems();
+    {
+        $items=$this->buildDataItems();
+        $clientItems=$this->loadClientItems();
 
-        $attrs=$this->getAttributes();
-        $attributes="";
-        foreach ($attrs as $key=>$val){
-            $attributes .= " ".$key."=\"".$val."\"";
-        }
-
-        $builder="";
-        if(!is_array($this->checkedValues)){
-            $this->checkedValues=explode(",",$this->checkedValues);
-        }
-        foreach($this->items as $item){
-            $attStr=$attributes;
-            if(in_array($item["value"],$this->checkedValues)){
-                $attStr.=" checked=\"checked\"";
-
+        //选中值
+        $checkedValues=[];
+        if(!empty($this->m_checkedValues)){
+            if(is_array($this->m_checkedValues)){
+                $checkedValues=$this->m_checkedValues;
+            }else{
+                $checkedValues=[$this->m_checkedValues];
             }
-            $builder .= "<input type=\"checkbox\" name=\"".$this->name."[]\" value=\"".$item["value"]."\" ".$attStr." /><label>".$item["text"]."</label>";
         }
-        if(isset($this->class) || $this->class !=""){
-            $builder="<div class=\"".$this->class."\">".$builder."</div>";
+
+        //属性
+        $attributeString="";
+        $attributes=$this->getAttributes();
+        foreach ($attributes as $name => $value){
+            $attributeString.=" ".$name."=\"".$value."\"";
+        }
+
+        //html
+        $builder="";
+
+        //items
+        foreach($items as $item){
+            $attStr=$attributeString;
+            if(in_array($item["value"], $checkedValues)){
+                $attStr.=" checked";
+            }
+            $builder .= "<input type=\"checkbox\" name=\"".$this->m_name."\" value=\"".$item["value"]."\"".$attStr." /><label>".$item["text"]."</label>\r\n";
+        }
+
+        //client items
+        foreach ($clientItems as $item){
+            $attStr=$attributeString;
+            if(in_array($item["value"], $checkedValues)){
+                $attStr.=" checked";
+            }
+            $builder .= "<input type=\"checkbox\" name=\"".$this->m_name."\" value=\"".$item["value"]."\"".$attStr." /><label>".$item["text"]."</label>\r\n";
         }
 
         return $builder;
 	}
 
 	/**
-	 * 绑定数据，当设置了$dataSource属性时，必须执行此方法，才能把数据映射到控件
-	 * @return void
-	 */
-	private function bindData()
-	{
-	    if(is_array($this->dataSource) && count($this->dataSource)>0){
-	        $this->items=[];
-	        if(count($this->dataSource)==count($this->dataSource,COUNT_RECURSIVE)){
-	            //键值对数组或对象数组
-	            foreach ($this->dataSource as $key => $value){
-	                if(is_object($value)){
-	                    $_value=ObjectUtil::getPropertyValue($value, $this->valueField,true);
-	                    $_text=ObjectUtil::getPropertyValue($value, $this->textField,true);
-	                    $this->items[]=["value"=>$_value,"text"=>$_text];
-	                }else{
-	                    $this->items[]=["value"=>$key,"text"=>$value];
-	                }
-	            }
-	        }else{
-	            //二维数组
-	            foreach($this->dataSource as $row){
-	                $this->items[]=["value"=>$row[$this->valueField],"text"=>$row[$this->textField]];
-	            }
-	        }
-	    }
-	}
-
-
-	/**
 	 * 加载客户端口定义的选项值，如果客户端有定义，则只呈现客户端的选项
 	 * 客户端选项标识如:value="{0,A}{1,B}"
 	 * @return void
 	 */
-	private function loadClientItems()
+	protected function loadClientItems()
 	{
-	    $attrs=$this->getAttributes();
-		if(isset($attrs["value"]) && $attrs["value"] != ""){
-			$this->items=[];
-			$items_array=explode("}",$attrs["value"]);
-			foreach($items_array as $item_string){
-				$item_string=str_replace("{","",$item_string);
-				$item_string=str_replace("}","",$item_string);
-				$item_array=explode(",",$item_string);
-				if(count($item_array)==2){
-					$this->addItem($item_array[0],$item_array[1]);
-				}
-			}
-		}
-	}
-
-	/**
-	 * 添加选项
-	 * @param $value string 选项值
-	 * @param $text string 选项文本
-	 * @param $index int 插入位置
-	 * @return void
-	 */
-	private function addItem($value,$text)
-	{
-	    $item=[];
-	    $item["value"]=$value;
-	    $item["text"]=$text;
-	    $this->items[]=$item;
+	    $items=[];
+	    if(!empty($this->m_items)){
+	        $string=$this->m_items;
+	        $string=str_replace("\\,", "######", $string);
+	        $string=str_replace("\\:", "#######", $string);
+	        $string=str_replace("\"", "", $string);
+	        $string=str_replace("'", "", $string);
+	        $items_array=explode(",", $string);
+	        foreach ($items_array as $item_string){
+	            $item_string=str_replace("{","",$item_string);
+	            $item_string=str_replace("}","",$item_string);
+	            $item_array=explode(":",$item_string);
+	            if(count($item_array)==2){
+	                $_name=$item_array[0];
+	                $_value=$item_array[1];
+	                $_value=str_replace("######", ",", $_value);
+	                $_value=str_replace("#######", ":", $_value);
+	                $items[]=["value"=>$_name,"text"=>$_value];
+	            }
+	        }
+	    }
+	    return $items;
 	}
 }

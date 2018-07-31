@@ -21,7 +21,7 @@ class Radio extends ListItemTagBase
     protected $m_name;
 
     /**
-     * 自定义选项集(json格式键值对)
+     * 自定义选项集(类json格式键值对)
      * @var string
      */
     protected $m_items="";
@@ -45,7 +45,7 @@ class Radio extends ListItemTagBase
     }
 
     /**
-     * 自定义选项集(json格式键值对)
+     * 自定义选项集(类json格式键值对)
      * @param string $value
      */
     public function setItems($value)
@@ -124,6 +124,5 @@ class Radio extends ListItemTagBase
         }
         return $items;
     }
-
 }
 
