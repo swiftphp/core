@@ -1,112 +1,96 @@
 <?php
 namespace swiftphp\core\web\tags;
 
-use swiftphp\core\utils\ObjectUtil;
-
-class Radio extends TagBase
+/**
+ * 单选框
+ * @author Tomix
+ *
+ */
+class Radio extends ListItemTagBase
 {
-    private $dataSource=[];
-    private $visible=true;
-    private $checkedValue;
-    private $class;
-    private $name;
-    private $valueField;
-    private $textField;
-    private $items=[];
+    /**
+     * 选中值
+     * @var string
+     */
+    protected $m_checkedValue;
 
-    public function setDataSource($value)
-    {
-        $this->dataSource=$value;
-    }
-    public function setVisible($value)
-    {
-        $this->visible=$value;
-    }
+    /**
+     * 名称
+     * @var string
+     */
+    protected $m_name;
+
+    /**
+     * 自定义选项集(json格式键值对)
+     * @var string
+     */
+    protected $m_items="";
+
+    /**
+     * 设置选中值
+     * @param string $value
+     */
     public function setCheckedValue($value)
     {
-        $this->checkedValue=$value;
+        $this->m_checkedValue=$value;
     }
-    public function setClass($value)
-    {
-        $this->class=$value;
-    }
+
+    /**
+     * 设置名称
+     * @param string $value
+     */
     public function setName($value)
     {
-        $this->name=$value;
-    }
-    public function setValueField($value)
-    {
-        $this->valueField=$value;
-    }
-    public function setTextField($value)
-    {
-        $this->textField=$value;
+        $this->m_name=$value;
     }
 
     /**
-     * 绑定数据，当设置了$dataSource属性时，必须执行此方法，才能把数据映射到控件
-     * @return void
+     * 自定义选项集(json格式键值对)
+     * @param string $value
      */
-    public function bindData()
+    public function setItems($value)
     {
-        if(is_array($this->dataSource) && count($this->dataSource)>0){
-            $this->items=[];
-            if(count($this->dataSource)==count($this->dataSource,COUNT_RECURSIVE)){
-                //键值对数组或对象数组
-                foreach ($this->dataSource as $key => $value){
-                    if(is_object($value)){
-                        $_value=ObjectUtil::getPropertyValue($value, $this->valueField,true);
-                        $_text=ObjectUtil::getPropertyValue($value, $this->textField,true);
-                        $this->items[]=["value"=>$_value,"text"=>$_text];
-                    }else{
-                        $this->items[]=["value"=>$key,"text"=>$value];
-                    }
-                }
-            }else{
-                //二维数组
-                foreach($this->dataSource as $row){
-                    $this->items[]=["value"=>$row[$this->valueField],"text"=>$row[$this->textField]];
-                }
-            }
-        }
+        $this->m_items=$value;
     }
 
     /**
-     * 覆盖父类getContent()方法,取得控件呈现给客户端的内容
-     * @see lib/beans/bean#getContent()
-     * @return string
+     * 实现父类getContent()抽象方法,取得控件呈现给客户端的内容
+     * {@inheritDoc}
+     * @see \swiftphp\core\web\tags\TagBase::getContent()
      */
     public function getContent(&$outputParams=[])
     {
-        if(!empty($this->dataSource)){
-            $this->bindData();
-        }else{
-            $this->loadClientItems();
+        $items=$this->buildDataItems();
+        $clientItems=$this->loadClientItems();
+
+        //属性
+        $attributeString="";
+        $attributes=$this->getAttributes();
+        foreach ($attributes as $name => $value){
+            $attributeString.=" ".$name."=\"".$value."\"";
         }
 
-        if(!$this->visible){
-            return "";
-        }
-
-        $attrs=$this->getAttributes();
-        $attributes="";
-        foreach(array_keys($attrs) as $name){
-            if($name != "value"){
-                $attributes .= " ".$name."=\"".$attrs[$name]."\"";
-            }
-        }
-
+        //html
         $builder="";
-        foreach($this->items as $item){
-            $attStr=$attributes;
-            if($item["value"]==$this->checkedValue){
-                $attStr.=" checked=\"checked\"";
+
+        //items
+        foreach($items as $item){
+            $attStr=$attributeString;
+            if($item["value"]==$this->m_checkedValue){
+                $attStr.=" checked";
             }
-            $builder .= "<input type=\"radio\" name=\"".$this->name."\" value=\"".$item["value"]."\"".$attStr." /><label>".$item["text"]."</label>";
+            $builder .= "<input type=\"radio\" name=\"".$this->m_name."\" value=\"".$item["value"]."\"".$attStr." /><label>".$item["text"]."</label>\r\n";
         }
-        if(isset($this->class) || $this->class !=""){
-            $builder="<div class=\"".$this->class."\">".$builder."</div>";
+
+        //client items
+        foreach ($clientItems as $item){
+            $attStr=$attributeString;
+            if($item["value"]==$this->m_checkedValue){
+                $attStr.=" checked";
+            }
+            $builder .= "<input type=\"radio\" name=\"".$this->m_name."\" value=\"".$item["value"]."\"".$attStr." /><label>".$item["text"]."</label>\r\n";
         }
+
         return $builder;
     }
 
@@ -115,16 +99,16 @@ class Radio extends TagBase
      * 客户端选项标识如:value="{0,A}{1,B}"
      * @return void
      */
-    private function loadClientItems()
+    protected function loadClientItems()
     {
-        $attrs=$this->getAttributes();
-        if(isset($attrs["value"]) && $attrs["value"] != ""){
-            $this->items=[];
-            $value=$attrs["value"];
-            //$value=str_replace("\'", "#####", $value);
-            $value=str_replace("\\,", "######", $value);
-            $value=str_replace("\\:", "#######", $value);
-            $items_array=explode(",", $value);
+        $items=[];
+        if(!empty($this->m_items)){
+            $string=$this->m_items;
+            $string=str_replace("\\,", "######", $string);
+            $string=str_replace("\\:", "#######", $string);
+            $string=str_replace("\"", "", $string);
+            $string=str_replace("'", "", $string);
+            $items_array=explode(",", $string);
             foreach ($items_array as $item_string){
                 $item_string=str_replace("{","",$item_string);
                 $item_string=str_replace("}","",$item_string);
@@ -132,48 +116,13 @@ class Radio extends TagBase
                 if(count($item_array)==2){
                     $_name=$item_array[0];
                     $_value=$item_array[1];
-                    //$_value=str_replace("#####", "'", $_value);
                     $_value=str_replace("######", ",", $_value);
                     $_value=str_replace("#######", ":", $_value);
-                    $this->addItem($_name,$_value);
+                    $items[]=["value"=>$_name,"text"=>$_value];
                 }
             }
         }
-    }
-
-
-    /**
-     * 添加选项
-     * @param $value string 选项值
-     * @param $text string 选项文本
-     * @param $index int 插入位置
-     * @return void
-     */
-    public function addItem($value,$text,$index=-1)
-    {
-        if(count($this->items)==0){
-            $item=[];
-            $item["value"]=$value;
-            $item["text"]=$text;
-            $this->items[]=$item;
-        }else if($index<0){
-            $item=[];
-            $item["value"]=$value;
-            $item["text"]=$text;
-            $this->items[]=$item;
-        }else{
-            $items=[];
-            for($i=0;$i<count($this->items);$i++){
-                if($i==$index){
-                    $item=[];
-                    $item["value"]=$value;
-                    $item["text"]=$text;
-                    $items[]=$item;
-                }
-                $items[]=$this->items[$i];
-            }
-            $this->items=$items;
-        }
+        return $items;
     }
 
 }

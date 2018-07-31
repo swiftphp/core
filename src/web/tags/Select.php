@@ -9,125 +9,228 @@ use swiftphp\core\utils\Convert;
  * @author Tomix
  *
  */
-class Select extends AbstractListItemBase
+class Select extends ListItemTagBase
 {
-    private $checkedValue;
+    /**
+     * 选中值
+     * @var string
+     */
+    private $m_checkedValue;
 
-    private $showTree=false;
-    private $idField;
-    private $pidField;
-    private $rootId;
-    private $level=-1;
-    private $separator="&nbsp;&nbsp;&nbsp;&nbsp;";
-    private $prefix="";
+    /**
+     * 是否树状显示数据
+     * @var bool
+     */
+    private $m_showTree=false;
 
-    private $showUndefine=false;
-    private $undefineText="Undefine";
-    private $undefineValue="";
+    /**
+     * 树状显示数据时,主键字段名
+     * @var string
+     */
+    private $m_idField;
 
-	private $items=[];
+    /**
+     * 树状显示数据时,上级字段名
+     * @var string
+     */
+    private $m_pidField;
 
+    /**
+     * 树状显示数据时,根字段值
+     * @var string
+     */
+    private $m_rootId;
+
+    /**
+     * 树状显示数据时,显示级数
+     * @var int
+     */
+    private $m_level=-1;
+
+    /**
+     * 树状显示数据时,缩进间隔文本
+     * @var string
+     */
+    private $m_separator="&nbsp;&nbsp;&nbsp;&nbsp;";
+
+    /**
+     * 树状显示数据时,选项文本前缀
+     * @var string
+     */
+    private $m_prefix="";
+
+    /**
+     * 是否显示未定义或默认选项
+     * @var string
+     */
+    private $m_showUndefine=false;
+
+    /**
+     * 显示未定义选项时的文本
+     * @var string
+     */
+    private $m_undefineText="Undefine";
+
+    /**
+     * 显示未定义选项时的值
+     * @var string
+     */
+    private $m_undefineValue="";
+
+    /**
+     * 设置选中值
+     * @param string $value
+     */
 	public function setCheckedValue($value)
 	{
-	    $this->checkedValue = $value;
+	    $this->m_checkedValue = $value;
 	}
-	public function setShowTree($value)
-	{
-	    $this->showTree = $value;
-	}
-	public function setIdField($value)
-	{
-	    $this->idField = $value;
-	}
-	public function setPidField($value)
-	{
-	    $this->pidField = $value;
-	}
-	public function setRootId($value)
-	{
-	    $this->rootId = $value;
-	}
-	public function setLevel($value)
-	{
-	    $this->level = $value;
-	}
-	public function setSeparator($value)
-	{
-	    $this->separator = $value;
-	}
-	public function setPrefix($value)
-	{
-	    $this->prefix=$value;
-	}
-	public function setShowUndefine($value)
-	{
-	    $this->showUndefine = $value;
-	}
-	public function setUndefineText($value)
-	{
-	    $this->undefineText = $value;
-	}
-	public function setUndefineValue($value)
-	{
-	    $this->undefineValue = $value;
-	}
-
-
 
 	/**
-	 * 覆盖父类getContent()方法,取得控件呈现给客户端的内容
-	 * @see lib/beans/bean#getContent()
-	 * @return string
+	 * 是否树状显示数据
+	 * @param bool $value
+	 */
+	public function setShowTree($value)
+	{
+	    $this->m_showTree = $value;
+	}
+
+	/**
+	 * 树状显示数据时,主键字段名
+	 * @param string $value
+	 */
+	public function setIdField($value)
+	{
+	    $this->m_idField = $value;
+	}
+
+	/**
+	 * 树状显示数据时,上级字段名
+	 * @param string $value
+	 */
+	public function setPidField($value)
+	{
+	    $this->m_pidField = $value;
+	}
+
+	/**
+	 * 树状显示数据时,根字段值
+	 * @param string $value
+	 */
+	public function setRootId($value)
+	{
+	    $this->m_rootId = $value;
+	}
+
+	/**
+	 * 树状显示数据时,显示级数
+	 * @param int $value
+	 */
+	public function setLevel($value)
+	{
+	    $this->m_level = $value;
+	}
+
+	/**
+	 * 树状显示数据时,缩进文本
+	 * @param string $value
+	 */
+	public function setSeparator($value)
+	{
+	    $this->m_separator = $value;
+	}
+
+	/**
+	 * 树状显示数据时,选项前缀文本
+	 * @param string $value
+	 */
+	public function setPrefix($value)
+	{
+	    $this->m_prefix=$value;
+	}
+
+	/**
+	 * 是否显示未定义选项
+	 * @param bool $value
+	 */
+	public function setShowUndefine($value)
+	{
+	    $this->m_showUndefine = $value;
+	}
+
+	/**
+	 * 显示未定义选项时,选项文本
+	 * @param string $value
+	 */
+	public function setUndefineText($value)
+	{
+	    $this->m_undefineText = $value;
+	}
+
+	/**
+	 * 显示未定义选项时,选项值
+	 * @param string $value
+	 */
+	public function setUndefineValue($value)
+	{
+	    $this->m_undefineValue = $value;
+	}
+
+	/**
+	 * 实现父类getContent()抽象方法,取得控件呈现给客户端的内容
+	 * {@inheritDoc}
+	 * @see \swiftphp\core\web\tags\TagBase::getContent()
 	 */
 	public function getContent(&$outputParams=[])
 	{
-		if(is_array($this->dataSource) && count($this->dataSource)>0){
-		    if($this->showTree){
-		        $this->buildTreeItems();
-		    }else{
-		        $this->items=$this->buildDataItems();
-		    }
-		}
+	    //选项列表
+        $items=[];
+        if($this->m_showTree){
+            $items=$this->buildTreeItems();
+        }else{
+            $items=$this->buildDataItems();
+        }
 
+        //客户端自定义选项列表
 		$clientItems=$this->loadClientItems();
 
-		$attrs=$this->getAttributes();
-		$attributes="";
-		foreach ($attrs as $name=>$val){
-		    $attributes .= " ".$name."=\"".$val."\"";
-		}
-		$builder="";
-		$builder .= "<select".$attributes.">\r\n";
-		if($this->showUndefine){
-			$option="<option value=\"{0}\">{1}</option>";
-			if($this->undefineValue==$this->checkedValue){
-				$option="<option selected=\"selected\" value=\"{0}\">{1}</option>";
-			}
-			$option=str_replace("{0}",$this->undefineValue,$option);
-			$option=str_replace("{1}",$this->undefineText,$option);
-			$builder.=$option."\r\n";
+		//返回文本值
+		$builder="<select";
 
+		//自定义属性值
+		$attrs=$this->getAttributes();
+		foreach ($attrs as $name=>$val){
+		    $builder .= " ".$name."=\"".$val."\"";
 		}
-		if(count($clientItems)>0){
-			foreach ($clientItems as $item){
-				$option=$item["option"];
-				if($item["value"]==$this->checkedValue){
-					$option=str_replace("<option","<option selected=\"selected\"",$option);
-				}
-				$builder.=$option;
-			}
-		}else{
-			foreach($this->items as $item){
-			    $value=$item["value"];
-			    $text=$item["text"];
-				$option="<option value=\"{0}\">{1}</option>";
-				if($value==$this->checkedValue){
-					$option="<option selected=\"selected\" value=\"{0}\">{1}</option>";
-				}
-				$option=str_replace("{0}",$value,$option);
-				$option=str_replace("{1}",$text,$option);
-				$builder.=$option."\r\n";
-			}
+		$builder.=">\r\n";
+
+		//未定义选项
+		if($this->m_showUndefine){
+		    $option="<option value=\"".$this->m_undefineValue."\"";
+		    if($this->m_undefineValue==$this->m_checkedValue){
+		        $option.=" selected";
+		    }
+		    $option.=">".$this->m_undefineText."</option>\r\n";
+		    $builder.=$option;
+		}
+
+		//选项值
+		foreach ($items as $item){
+		    $option="<option value=\"".$item["value"]."\"";
+		    if($item["value"]==$this->m_checkedValue){
+		        $option.=" selected";
+		    }
+		    $option.=">".$item["text"]."</option>\r\n";
+		    $builder.=$option;
+		}
+
+		//自定义的选项
+		foreach ($clientItems as $item){
+		    $option=$item["option"];
+		    if($item["value"]==$this->m_checkedValue){
+		        $option=str_replace("<option","<option selected",$option);
+		    }
+		    $builder.=$option."\r\n";
 		}
 		$builder.="</select>";
 		return $builder;
@@ -139,64 +242,74 @@ class Select extends AbstractListItemBase
 	 */
 	private function buildTreeItems()
 	{
-	    foreach($this->dataSource as $obj){
+	    $items=[];
+	    $i=0;
+	    $data=$this->m_dataSource;
+	    foreach($data as $obj){
 	        $rootArray=[];
-	        if(isset($this->rootId)){
-	            $rootArray[0]=$this->rootId;
+	        if(isset($this->m_rootId)){
+	            $rootArray[0]=$this->m_rootId;
 	        }else{
 	            $rootArray[0]="";
 	            $rootArray[1]="0";
 	            $rootArray[2]=null;
 	        }
 
-	        $pid=Convert::getFieldValue($obj, $this->pidField,true);
+	        $pid=Convert::getFieldValue($obj, $this->m_pidField,true);
 	        if(in_array($pid,$rootArray)){
 	            //取得根的下一级子数据
 	            $item=[];
-	            $item["value"]=Convert::getFieldValue($obj, $this->valueField,true);
-	            $item["text"]=$this->prefix.Convert::getFieldValue($obj, $this->textField,true);
-	            $this->items[]=$item;
+	            $item["value"]=Convert::getFieldValue($obj, $this->m_valueField,true);
+	            $item["text"]=$this->m_prefix.Convert::getFieldValue($obj, $this->m_textField,true);
+	            $items[]=$item;
+	            unset($data[$i]);
 
 	            //取所有子選項
-	            $id=Convert::getFieldValue($obj, $this->idField,true);
-	            $this->buildChildItems($id,1);
+	            $id=Convert::getFieldValue($obj, $this->m_idField,true);
+	            $this->buildChildItems($data,$id,1,$items);
 	        }
+	        $i++;
 	    }
+	    return $items;
 	}
 
 	/**
 	 * 创建树状结构时创建子选项集
+	 * @param $data
 	 * @param $pid
 	 * @param $level
-	 * @return unknown_type
+	 * @param $items
 	 */
-	private function buildChildItems($pid,$level)
+	private function buildChildItems(&$data,$pid,$level,&$items)
 	{
-	    if($this->level<0){
-	        $this->level=99999999;
+	    if($this->m_level<0){
+	        $this->m_level=99999999;
 	    }
-        if($level > $this->level){
+	    if($level > $this->m_level){
             return;
         }
 
         //文本缩进符号
         $sep="";
         for($i=0;$i<$level;$i++){
-            $sep .= $this->separator;
+            $sep .= $this->m_separator;
         }
-        $sep.=$this->prefix;
-        foreach($this->dataSource as $obj){
-            $pidValue=Convert::getFieldValue($obj, $this->pidField,true);
+        $sep.=$this->m_prefix;
+        $i=0;
+        foreach($data as $obj){
+            $pidValue=Convert::getFieldValue($obj, $this->m_pidField,true);
             if($pidValue==$pid){
                 $item=[];
-                $item["value"]=Convert::getFieldValue($obj, $this->valueField,true);
-                $item["text"]=$sep.Convert::getFieldValue($obj, $this->textField,true);
-                $this->items[]=$item;
+                $item["value"]=Convert::getFieldValue($obj, $this->m_valueField,true);
+                $item["text"]=$sep.Convert::getFieldValue($obj, $this->m_textField,true);
+                $items[]=$item;
+                unset($data[$i]);
 
                 //取得所有子选项
-                $idValue=Convert::getFieldValue($obj, $this->idField,true);
-                $this->buildChildItems($idValue,$level+1);
+                $idValue=Convert::getFieldValue($obj, $this->m_idField,true);
+                $this->buildChildItems($data,$idValue,$level+1,$items);
             }
+            $i++;
         }
 	}
 
