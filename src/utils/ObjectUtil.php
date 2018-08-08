@@ -111,7 +111,7 @@ class ObjectUtil
      * @param string $fieldAccess  是否允许直接访问公开字段
      * @return boolean
      */
-    public static function copyPropertyValues($srcObject,$destObject,$fieldMap=[],$fieldAccess=false)
+    public static function copyPropertyValues($srcObject,$destObject,$fieldMap=null,$fieldAccess=false)
     {
         if(!is_object($srcObject)||!is_object($destObject)){
             return false;
@@ -119,6 +119,9 @@ class ObjectUtil
         $destFields=[];
         if($fieldAccess){
             $destFields=array_keys(get_object_vars($destObject));
+        }
+        if($fieldMap==null){
+            $fieldMap=[];
         }
         foreach (get_object_vars($srcObject) as $prop=>$value){
             $destProp=array_key_exists($prop, $fieldMap)?$fieldMap[$prop]:$prop;
