@@ -126,19 +126,36 @@ class HtmlView extends View implements IOutput
 
     /**
      * 替换标签内容
-     * @param string $view
+     * @param string $view 视图模板
+     * @return mixed
      */
-    protected function loadTags($view,&$outputParams=[])
+    protected function loadTags($view)
+    {
+        $tagOutHtml=$this->findTag($view);
+        while ($tagOutHtml){
+            $tagHtml=$this->getTagHtml($tagOutHtml);
+            $view=str_replace($tagOutHtml, $tagHtml, $view);
+            $tagOutHtml=$this->findTag($view);
+        }
+        return $view;
+    }
+
+    /**
+     * 查询标签,返回标签内容
+     * @param string $view
+     * @return boolean|string
+     */
+    protected function findTag($view)
     {
         //$start="/<".$this->m_tagPlaceHolder." _tag=\"([a-zA-Z]{1,}[\w-]*):([a-zA-Z]{1,}[\w]*)\"/";
         $start="<".$this->m_tagPlaceHolder." ";
         $end="</".$this->m_tagPlaceHolder.">";
 
-        //不套嵌的标签起止位置
+        //不套嵌的标签起止位置,搜索不到位置直接返回
         $startPos=strpos($view, $start);
         $endPos=strpos($view, $end);
         if(!$startPos || !$endPos || $endPos<=$startPos){
-            return $view;
+            return false;
         }
 
         //假设当前找到的结束标签为结束标签,那么要满足:
@@ -155,13 +172,25 @@ class HtmlView extends View implements IOutput
             $endPos=strpos($view, $end,$endPos+1);
         }
         $outerHtml=substr($view, $startPos,$endPos-$startPos+strlen($end));
+        return $outerHtml;
+    }
 
-        //标签内容替换
+    /**
+     * 获取标签替换后的内容
+     * @param string $outerHtml
+     * @return mixed
+     */
+    protected function getTagHtml($outerHtml)
+    {
+        $outputParams=[];
         $tagHtml=$this->getTagContent($outerHtml,$outputParams);
-        $view=str_replace($outerHtml, $tagHtml, $view);
-
-        //返回清除标签后的内容,递归处理子标签
-        return $this->loadTags($view,$outputParams);
+        $childTagOutHtml=$this->findTag($tagHtml);
+        while ($childTagOutHtml){
+            $childTagHtml=$this->getTagHtml($childTagOutHtml);
+            $tagHtml=str_replace($childTagOutHtml, $childTagHtml, $tagHtml);
+            $childTagOutHtml=$this->findTag($tagHtml);
+        }
+        return $tagHtml;
     }
 
     /**
