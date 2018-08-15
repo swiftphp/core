@@ -47,9 +47,9 @@ class IfElse extends TagBase
         }
 
         if($compare){
-            return str_replace($elseHtml, "", $this->getInnerHtml());
+            return str_replace($elseHtml, "", trim($this->getInnerHtml()));
         }else{
-            return $elseTemp;
+            return trim($elseTemp);
         }
     }
 
