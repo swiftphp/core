@@ -53,18 +53,21 @@ class DataUtil
      */
     public static function getOffSprings($source,$idField,$pidField,$fieldValue,$includeSelf=true,$level=-1)
     {
-        $returnValue=self::_getOffSprings($source,$idField,$pidField,$fieldValue,$level);
-
-        //添加自身
-        if($includeSelf){
-            foreach($source as $item){
-                $value=Convert::getFieldValue($item, $idField,true);
-                if($value == $fieldValue){
-                    $returnValue[]=$item;
-                    break;
-                }
-            }
+        if(empty($source)){
+            return [];
         }
+
+        //元素为对象时,通过第一个元素检测getter
+        $idGetter=null;
+        $pidGetter=null;
+        $first=$source[array_keys($source)[0]];
+        $isObject=is_object($first);
+        if($isObject){
+            $idGetter=ObjectUtil::getGetter($first, $idField);
+            $pidGetter=ObjectUtil::getGetter($first, $pidField);
+        }
+
+        $returnValue=self::_getOffSprings($source,$isObject,$idField,$idGetter,$pidField,$pidGetter,$fieldValue,$level,$includeSelf);
 
         return $returnValue;
     }
@@ -119,17 +122,21 @@ class DataUtil
         return $returnValue;
     }
 
-
-
     /**
-     * 私有方法:取得树型数据的子级数据,该方法是getOffSprings()的辅助方法
-     * @param $source 		数据源
-     * @param $idField  	主键字段名
-     * @param $pidField		上级数据主键字段名
-     * @param $fieldValue	主键字段值
+     * 私有方法:取得树型数据的下级数据,该方法是getOffSprings()的辅助方法
+     * @param array $source 		数据源
+     * @param boolean $isObject     数据源元素是否为对象
+     * @param string $idField  	        主键字段名
+     * @param string $idGetter  	数据源元素时,主键字段Getter
+     * @param string $pidField		上级数据主键字段名
+     * @param string $pidGetter     数据源元素时,上级数据主键字段Getter
+     * @param mixed $fieldValue	        搜索字段值
+     * @param integer $level        搜索最大深度
+     * @param boolean $includeSelf  是否包含自身
+     * @param integer $currentLevel 当前搜索深度
      * @return array
      */
-    private static function _getOffSprings($source,$idField,$pidField,$fieldValue,$level,$currentLevel=0)
+    private static function _getOffSprings(&$source,$isObject,$idField,$idGetter,$pidField,$pidGetter,$fieldValue,$level,$includeSelf=true,$currentLevel=0)
     {
         if($level<0){
             $level=9999;
@@ -138,25 +145,61 @@ class DataUtil
             return [];
         }
         $returnValue=[];
+        $hasSelf=false;
         foreach($source as $item){
-            $pvalue=Convert::getFieldValue($item, $pidField,true);
+            //当前深度为0时,添加自身
+            if($currentLevel == 0 && $includeSelf && !$hasSelf){
+                //$value=Convert::getFieldValue($item, $idField,true);
+                $value=self::getFieldValue($item, $idField,$isObject,$idGetter);
+                if($value==$fieldValue){
+                    $returnValue[]=$item;
+                    $index=array_search($item,$source);
+                    if(null!=$index){
+                        unset($source[$index]);
+                    }
+                    $hasSelf=true;
+                    continue;
+                }
+            }
+
+            //取下级数据
+            //$pvalue=Convert::getFieldValue($item, $pidField,true);
+            $pvalue=self::getFieldValue($item, $pidField,$isObject,$pidGetter);
             if($pvalue == $fieldValue){
                 $returnValue[]=$item;
                 $index=array_search($item,$source);
                 if(null!=$index){
                     unset($source[$index]);
                 }
-            }
-        }
-        $rootArray=$returnValue;
-        foreach($rootArray as $item){
-            $value=Convert::getFieldValue($item, $idField,true);
-            $temp=self::_getOffSprings($source,$idField,$pidField,$value,$level,$currentLevel+1);
-            if(count($temp)>0){
-                $returnValue=array_merge_recursive($returnValue,$temp);
+
+                //递归取再下级数据
+                //$value=Convert::getFieldValue($item, $idField,true);
+                $value=self::getFieldValue($item, $idField,$isObject,$idGetter);
+                $children=self::_getOffSprings($source,$isObject,$idField,$idGetter,$pidField,$pidGetter,$value,$level,false,$currentLevel+1);
+                $returnValue=array_merge($returnValue,$children);
             }
         }
         return $returnValue;
+    }
+
+    /**
+     * 取字段值
+     * @param array|object $item
+     * @param string $field
+     * @param boolean $isObject
+     * @param string $fieldGetter
+     * @return mixed
+     */
+    private static function getFieldValue($item,$field,$isObject=false, $fieldGetter=null)
+    {
+        if(!$isObject){
+            return $item[$field];
+        }else if($isObject && $fieldGetter){
+            return $item->$fieldGetter();
+        }else if($isObject && property_exists($item, $field)){
+            return $item->$field;
+        }
+        return null;
     }
 
     /**
