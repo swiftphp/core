@@ -75,10 +75,7 @@ class NumberFormat extends TagBase
     {
         $exp=trim($this->m_value);
         $code="return (".$exp.");";
-        $value=0;
-        try{
-            $value=eval($code);
-        }catch (\Exception $ex){}
+        $value=eval($code);
         return number_format($value,$this->m_decimals,$this->m_decimalpoint,$this->m_separator);
     }
 }
