@@ -2,11 +2,11 @@
 namespace swiftphp\core\data\orm\mapping;
 
 use swiftphp\core\data\db\IDatabase;
-use swiftphp\core\system\ILogger;
-use swiftphp\core\system\ICacher;
 use swiftphp\core\config\IConfigurable;
 use swiftphp\core\config\IConfiguration;
 use swiftphp\core\io\Path;
+use swiftphp\core\cache\ICacher;
+use swiftphp\core\logger\ILogger;
 
 /**
  * ORM配置抽象类

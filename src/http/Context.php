@@ -1,15 +1,12 @@
 <?php
 namespace swiftphp\core\http;
 
-use swiftphp\core\config\IConfigurable;
-use swiftphp\core\config\IConfiguration;
-
 /**
  * 请求,响应上下文
  * @author Tomix
  *
  */
-class Context implements IConfigurable
+class Context
 {
     /**
      * 当前请求
@@ -24,12 +21,6 @@ class Context implements IConfigurable
     private $m_response;
 
     /**
-     * 配置实例
-     * @var IConfiguration
-     */
-    private $m_config;
-
-    /**
      * 构造函数
      * @param Request $request
      * @param Response $response
@@ -38,16 +29,6 @@ class Context implements IConfigurable
     {
         $this->m_request=$request;
         $this->m_response=$response;
-    }
-
-
-    /**
-     * 注入配置实例
-     * @param IConfiguration $value
-     */
-    public function setConfiguration(IConfiguration $value)
-    {
-        $this->m_config=$value;
     }
 
     /**

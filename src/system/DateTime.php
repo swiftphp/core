@@ -288,6 +288,15 @@ class DateTime
     }
 
     /**
+     * \DateTime转为DateTime
+     * @param \DateTime $dateTime
+     */
+    public static function fromDateTime(\DateTime $dateTime)
+    {
+        return new DateTime($dateTime->getTimestamp());
+    }
+
+    /**
      * 表示当前时间的对象
      * @return DateTime
      */

@@ -1,8 +1,8 @@
 <?php
 namespace swiftphp\core\data\orm;
 
-use swiftphp\core\utils\ObjectUtil;
-use swiftphp\core\utils\StringUtil;
+use swiftphp\core\common\util\ObjectUtil;
+use swiftphp\core\common\util\StringUtil;
 
 /**
  * 实体功能类

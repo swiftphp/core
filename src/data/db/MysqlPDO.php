@@ -1,8 +1,8 @@
 <?php
 namespace swiftphp\core\data\db;
 
-use swiftphp\core\system\ILogger;
 use swiftphp\core\system\Console;
+use swiftphp\core\logger\ILogger;
 
 /**
  * 数据访问PDO实现

@@ -1,6 +1,9 @@
 <?php
 namespace swiftphp\core\config;
 
+use swiftphp\core\config\internal\PhpConfiguration;
+use swiftphp\core\config\internal\XmlConfiguration;
+
 /**
  * 配置工厂
  * @author Tomix
@@ -52,7 +55,7 @@ class ConfigurationFactory
         $xmlConfigFile=$_configFile.".xml";
         $_configFile=file_exists($phpConfigFile)?$phpConfigFile:$xmlConfigFile;
         if(!file_exists($_configFile)){
-            throw new \Exception("Fail to load configuration file!");
+            throw new \Exception("Fail to load configuration file '".$configFile."'!");
         }
 
         //如果缓存存在,则直接返回实例

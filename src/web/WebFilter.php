@@ -8,8 +8,9 @@ use swiftphp\core\http\Context;
 use swiftphp\core\http\FilterChain;
 use swiftphp\core\web\IView;
 use swiftphp\core\http\IOutput;
-use swiftphp\core\web\out\Base;
-use swiftphp\core\web\out\HtmlView;
+use swiftphp\core\web\internal\ControllerFactory;
+use swiftphp\core\web\internal\out\HtmlView;
+use swiftphp\core\web\internal\out\Base;
 
 /**
  * MVC模型入口,Web过滤器
@@ -75,11 +76,11 @@ class WebFilter implements IFilter,IConfigurable
      */
     public function getRuntimeDir()
     {
-        $dir=$this->m_config->getBaseDir();
-        if(!empty($this->m_runtimeDir)){
-            return $dir."/".trim($this->m_runtimeDir,"/");
+        $dir=$this->m_runtimeDir;
+        if(empty($dir)){
+            $dir=$this->m_config->getBaseDir()."/_runtime";
         }
-        return $dir."/_runtime";
+        return $dir;
     }
 
     /**
@@ -115,15 +116,12 @@ class WebFilter implements IFilter,IConfigurable
      */
     public function getControllerFactory()
     {
-        //外部注入的工厂
+        //外部注入的控制器工厂
         $factory=$this->m_controllerFactory;
 
-        //默认控制器类型
-        $defaultFactoryClass=ControllerFactory::class;
-
-        //如果外部没有注入,从对象工厂创建
-        if(is_null($factory)){
-            $factory=$this->m_config->getObjectFactory()->createByClass($defaultFactoryClass);
+        //如果外部没有注入,从对象工厂创建默认的控制器工厂
+        if(!$factory){
+            $factory=$this->m_config->getObjectFactory()->createByClass(ControllerFactory::class);
         }
 
         //返回工厂实例

@@ -1,27 +1,16 @@
 <?php
 namespace swiftphp\core\http;
 
-use swiftphp\core\config\IConfiguration;
-use swiftphp\core\system\ILogger;
-use swiftphp\core\io\Path;
 use swiftphp\core\system\IRunnable;
-use swiftphp\core\config\IConfigurable;
-use swiftphp\core\config\ConfigurationFactory;
-use swiftphp\core\system\Application;
+use swiftphp\core\logger\ILogger;
 
 /**
  * 主入口容器
  * @author Tomix
  *
  */
-class Container implements IRunnable,IConfigurable
+class Container implements IRunnable
 {
-    /**
-     * 当前运行的配置实例
-     * @var IConfiguration
-     */
-    private $m_config = null;
-
     /**
      * 上下文
      * @var Context
@@ -57,15 +46,6 @@ class Container implements IRunnable,IConfigurable
      * @var string
      */
     private $m_errorTemplate="";
-
-    /**
-     * 注入配置实例
-     * @param IConfiguration $value
-     */
-    public function setConfiguration(IConfiguration $value)
-    {
-        $this->m_config=$value;
-    }
 
     /**
      * 是否为调试模式
@@ -146,8 +126,8 @@ class Container implements IRunnable,IConfigurable
                 }
 
                 //如果模板文件存在，则按模板输出
-                $tempFile=Path::combinePath($this->m_config->getBaseDir(), $this->m_errorTemplate);
-                if(is_file($tempFile)){
+                $tempFile=$this->m_errorTemplate;
+                if(is_file($this->m_errorTemplate)){
                     echo file_get_contents($tempFile);
                 }else{
                     echo $msg;
@@ -159,29 +139,6 @@ class Container implements IRunnable,IConfigurable
                 throw $ex;
             }
         }
-    }
-
-    /**
-     * 静态的引导入口
-     * @param string $configFile   主配置文件位置
-     * @param string $baseDir       应用根目录(默认为配置入口文件所在目录)
-     * @param string $userDir       用户根目录(默认与应用根目录相同)
-     * @param array $extConfigs     附加扩展的配置(section,name,value形式的数组,默认为空)
-     * @param string $containerId   容器对象ID(默认为:container)
-     */
-    public static function boot($configFile,$baseDir="",$userDir="",$extConfigs=[],$containerId="container")
-    {
-        //使用配置工厂创建配置实例
-        $config=ConfigurationFactory::create($configFile,$baseDir,$userDir,$extConfigs);
-
-        //获取对象工厂
-        $objectFactory=$config->getObjectFactory();
-
-        //使用对象工厂创建容器实例
-        $container=$objectFactory->create($containerId);
-
-        //执行一个容器实例
-        Application::run($container);
     }
 
     /**
@@ -231,7 +188,6 @@ class Container implements IRunnable,IConfigurable
 
         //context
         $this->m_context=new Context($req,$rsp);
-        $this->m_context->setConfiguration($this->m_config);
     }
 
     /**
