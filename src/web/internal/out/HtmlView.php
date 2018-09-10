@@ -180,13 +180,12 @@ class HtmlView extends View implements IOutput
      * @param string $outerHtml
      * @return mixed
      */
-    protected function getTagHtml($outerHtml)
+    protected function getTagHtml($outerHtml,&$outputParams=[])
     {
-        $outputParams=[];
         $tagHtml=$this->getTagContent($outerHtml,$outputParams);
         $childTagOutHtml=$this->findTag($tagHtml);
         while ($childTagOutHtml){
-            $childTagHtml=$this->getTagHtml($childTagOutHtml);
+            $childTagHtml=$this->getTagHtml($childTagOutHtml,$outputParams);
             $tagHtml=str_replace($childTagOutHtml, $childTagHtml, $tagHtml);
             $childTagOutHtml=$this->findTag($tagHtml);
         }
