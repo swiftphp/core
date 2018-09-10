@@ -54,9 +54,11 @@ class DateTimeFormat extends TagBase
      * \DateTime对象
      * @param \DateTime $value
      */
-    public function setObject(\DateTime $value)
+    public function setObject($value)
     {
-        $this->m_object=$value;
+        if(!empty($value)&& $value instanceof \DateTime){
+            $this->m_object=$value;
+        }
     }
 
     /**
@@ -73,7 +75,7 @@ class DateTimeFormat extends TagBase
      */
     public function getContent(&$outputParams=[])
     {
-        $time=time();
+        $time=null;
         if($this->m_time>0){
             $time=$this->m_time;
         }else if(!empty($this->m_string)){
@@ -81,6 +83,9 @@ class DateTimeFormat extends TagBase
         }else if(!is_null($this->m_object)){
             $time=$this->m_object->getTimestamp();
         }
-        return date($this->m_format,$time);
+        if(!empty($time)){
+            return date($this->m_format,$time);
+        }
+        return "";
     }
 }
